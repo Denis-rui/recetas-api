@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Actions\Usuarios\ActualizarCuenta;
 use App\Actions\Usuarios\CambiarRol;
+use App\Actions\Usuarios\ConsultarCuentasDataTable;
 use App\Actions\Usuarios\CrearCuenta;
 use App\Actions\Usuarios\DeshabilitarCuenta;
 use App\Actions\Usuarios\ReactivarCuenta;
@@ -11,6 +12,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Usuarios\ActualizarUsuarioRequest;
 use App\Http\Requests\Usuarios\CrearUsuarioRequest;
 use App\Models\User;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -19,26 +21,17 @@ use Illuminate\View\View;
 class UsuarioController extends Controller
 {
     /**
-     * Muestra la tabla de cuentas con opción de búsqueda por nombre o correo.
+     * Muestra la tabla de cuentas o devuelve los datos asíncronos para DataTables Server-Side.
      */
-    public function index(Request $request): View
+    public function index(Request $request, ConsultarCuentasDataTable $accion): View|JsonResponse
     {
         Gate::authorize('viewAny', User::class);
 
-        $buscar = trim((string) $request->input('buscar'));
+        if ($request->ajax() || $request->wantsJson()) {
+            return response()->json($accion->ejecutar($request, $request->user()));
+        }
 
-        $usuarios = User::query()
-            ->when($buscar !== '', function ($query) use ($buscar) {
-                $query->where(function ($sub) use ($buscar) {
-                    $sub->where('name', 'like', "%{$buscar}%")
-                        ->orWhere('email', 'like', "%{$buscar}%");
-                });
-            })
-            ->orderBy('id', 'desc')
-            ->paginate(10)
-            ->withQueryString();
-
-        return view('usuarios.index', compact('usuarios', 'buscar'));
+        return view('usuarios.index');
     }
 
     /**
@@ -132,4 +125,3 @@ class UsuarioController extends Controller
             ->with('exito', "La cuenta de {$usuario->name} ha sido reactivada.");
     }
 }
-

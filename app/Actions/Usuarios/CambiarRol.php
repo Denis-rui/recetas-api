@@ -31,4 +31,3 @@ class CambiarRol
         return $usuario;
     }
 }
-

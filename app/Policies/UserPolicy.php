@@ -71,4 +71,3 @@ class UserPolicy
             && ! $user->estaActivo();
     }
 }
-

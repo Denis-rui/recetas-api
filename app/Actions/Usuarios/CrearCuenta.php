@@ -4,7 +4,6 @@ namespace App\Actions\Usuarios;
 
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
 class CrearCuenta
 {
@@ -33,4 +32,3 @@ class CrearCuenta
         ]);
     }
 }
-

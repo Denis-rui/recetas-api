@@ -73,4 +73,3 @@ test('se rechaza el cambio de contrasena si la nueva tiene menos de 12 caractere
 
     $response->assertSessionHasErrors('password');
 });
-

@@ -52,4 +52,3 @@ class PerfilController extends Controller
             ->with('exito_password', 'Su contraseña ha sido cambiada exitosamente.');
     }
 }
-

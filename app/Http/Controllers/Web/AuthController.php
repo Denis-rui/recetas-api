@@ -85,4 +85,3 @@ class AuthController extends Controller
         return redirect()->route('login')->with('exito', 'Ha cerrado sesión correctamente.');
     }
 }
-

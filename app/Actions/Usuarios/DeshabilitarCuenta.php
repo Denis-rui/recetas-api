@@ -28,4 +28,3 @@ class DeshabilitarCuenta
         return $usuario;
     }
 }
-
