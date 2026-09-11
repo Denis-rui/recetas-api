@@ -12,7 +12,7 @@ class VerificarAdministradorActivo
     /**
      * Comprueba que el usuario autenticado esté activo y posea el rol de administrador.
      *
-     * @param  \Closure(\Illuminate\Http\Request): (\Symfony\Component\HttpFoundation\Response)  $next
+     * @param  Closure(Request): (Response)  $next
      */
     public function handle(Request $request, Closure $next): Response
     {
@@ -45,4 +45,3 @@ class VerificarAdministradorActivo
         return $next($request);
     }
 }
-

@@ -1,7 +1,6 @@
 <?php
 
 use App\Models\User;
-use Illuminate\Support\Facades\Hash;
 
 test('se puede visualizar la pantalla de inicio de sesion', function () {
     $response = $this->get(route('login'));
@@ -99,4 +98,3 @@ test('un administrador puede cerrar sesion correctamente', function () {
     $response->assertRedirect(route('login'));
     $this->assertGuest();
 });
-

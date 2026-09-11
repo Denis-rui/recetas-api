@@ -20,4 +20,3 @@ class ReactivarCuenta
         return $usuario;
     }
 }
-

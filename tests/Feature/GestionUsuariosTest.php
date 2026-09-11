@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     $this->admin = User::create([
@@ -12,7 +13,15 @@ beforeEach(function () {
     ]);
 });
 
-test('un administrador activo puede ver la tabla de usuarios', function () {
+test('un administrador activo puede ver la pantalla principal de gestion de usuarios', function () {
+    $response = $this->actingAs($this->admin)->get(route('usuarios.index'));
+
+    $response->assertStatus(200);
+    $response->assertSee('Gestión de usuarios');
+    $response->assertSee('tabla-usuarios');
+});
+
+test('el endpoint asincrono de datatables devuelve la estructura server-side esperada', function () {
     User::create([
         'name' => 'Carlos Mendoza',
         'email' => 'carlos@quecocinamos.com',
@@ -21,15 +30,25 @@ test('un administrador activo puede ver la tabla de usuarios', function () {
         'activo' => true,
     ]);
 
-    $response = $this->actingAs($this->admin)->get(route('usuarios.index'));
+    $response = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'draw' => 1,
+        'start' => 0,
+        'length' => 10,
+    ]));
 
     $response->assertStatus(200);
-    $response->assertSee('Gestión de usuarios');
-    $response->assertSee('Carlos Mendoza');
-    $response->assertSee('carlos@quecocinamos.com');
+    $response->assertJsonStructure([
+        'draw',
+        'recordsTotal',
+        'recordsFiltered',
+        'data',
+    ]);
+    $response->assertJsonPath('recordsTotal', 2); // Admin + Carlos
+    $response->assertJsonPath('recordsFiltered', 2);
+    $this->assertStringContainsString('Carlos Mendoza', json_encode($response->json('data')));
 });
 
-test('se pueden buscar cuentas por nombre o correo', function () {
+test('el endpoint asincrono filtra cuentas por busqueda textual con debounce', function () {
     User::create([
         'name' => 'Maria Fernandez',
         'email' => 'maria@quecocinamos.com',
@@ -38,13 +57,56 @@ test('se pueden buscar cuentas por nombre o correo', function () {
         'activo' => true,
     ]);
 
-    $response = $this->actingAs($this->admin)->get(route('usuarios.index', ['buscar' => 'Fernandez']));
+    User::create([
+        'name' => 'Roberto Silva',
+        'email' => 'roberto@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    $response = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'draw' => 2,
+        'start' => 0,
+        'length' => 10,
+        'search' => ['value' => 'Fernandez'],
+    ]));
 
     $response->assertStatus(200);
-    $response->assertSee('Maria Fernandez');
+    $response->assertJsonPath('recordsFiltered', 1);
+    $this->assertStringContainsString('Maria Fernandez', json_encode($response->json('data')));
+    $this->assertStringNotContainsString('Roberto Silva', json_encode($response->json('data')));
+});
 
-    $responseVacio = $this->actingAs($this->admin)->get(route('usuarios.index', ['buscar' => 'InexistenteXYZ']));
-    $responseVacio->assertSee('No se encontraron cuentas');
+test('el endpoint asincrono filtra cuentas por rol y por estado', function () {
+    User::create([
+        'name' => 'Usuario Normal Activo',
+        'email' => 'user.activo@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    User::create([
+        'name' => 'Admin Deshabilitado',
+        'email' => 'admin.inactivo@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'administrador',
+        'activo' => false,
+    ]);
+
+    // Filtrar solo administradores
+    $respRol = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'filtro_rol' => 'administrador',
+    ]));
+    $respRol->assertJsonPath('recordsFiltered', 2); // Admin principal + Admin Deshabilitado
+
+    // Filtrar solo deshabilitados
+    $respEstado = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'filtro_estado' => 'deshabilitado',
+    ]));
+    $respEstado->assertJsonPath('recordsFiltered', 1);
+    $this->assertStringContainsString('admin.inactivo@quecocinamos.com', json_encode($respEstado->json('data')));
 });
 
 test('un administrador puede crear una cuenta con rol y estado activo automatico', function () {
@@ -208,7 +270,7 @@ test('deshabilitar una cuenta invalida sus sesiones web activas en la base de da
     ]);
 
     // Insertar sesión activa en tabla sessions
-    \Illuminate\Support\Facades\DB::table('sessions')->insert([
+    DB::table('sessions')->insert([
         'id' => 'test_session_id_123',
         'user_id' => $otro->id,
         'ip_address' => '127.0.0.1',

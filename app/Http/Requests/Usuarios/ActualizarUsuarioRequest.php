@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests\Usuarios;
 
+use App\Models\User;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,13 +17,13 @@ class ActualizarUsuarioRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        /** @var \App\Models\User $usuario */
+        /** @var User $usuario */
         $usuario = $this->route('usuario');
-        $usuarioId = $usuario instanceof \App\Models\User ? $usuario->id : $usuario;
+        $usuarioId = $usuario instanceof User ? $usuario->id : $usuario;
 
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -50,4 +52,3 @@ class ActualizarUsuarioRequest extends FormRequest
         ];
     }
 }
-

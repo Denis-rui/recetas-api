@@ -30,4 +30,3 @@ class ActualizarPerfil
         return $usuario;
     }
 }
-
