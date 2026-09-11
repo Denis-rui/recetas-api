@@ -12,11 +12,11 @@
 
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-full font-sans antialiased text-slate-800 bg-slate-50 flex flex-col md:flex-row">
-    <!-- Barra de Navegación Lateral Izquierda (Sidebar) -->
-    <aside class="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col md:min-h-screen shrink-0 sticky md:top-0 z-30">
+<body class="h-full md:h-screen md:overflow-hidden font-sans antialiased text-slate-800 bg-slate-50 flex flex-col md:flex-row">
+    <!-- Barra Lateral Izquierda Fija (Sidebar con altura exacta de pantalla) -->
+    <aside class="w-full md:w-64 bg-white border-b md:border-b-0 md:border-r border-slate-200 flex flex-col md:h-screen shrink-0 z-30">
         <!-- Marca / Logotipo -->
-        <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div class="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
             <a href="{{ route('usuarios.index') }}" class="flex items-center space-x-3 group">
                 <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs group-hover:bg-amber-600 transition">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -50,7 +50,7 @@
         </nav>
 
         <!-- Pie del Sidebar: Información del Administrador y Cerrar Sesión -->
-        <div class="p-4 border-t border-slate-200 bg-slate-50/70 space-y-3">
+        <div class="p-4 border-t border-slate-200 bg-slate-50/70 space-y-3 shrink-0">
             <div class="flex items-center space-x-3">
                 @if(auth()->user()->foto_perfil)
                     <img src="{{ asset('storage/' . auth()->user()->foto_perfil) }}" alt="{{ auth()->user()->name }}" class="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0">
@@ -79,8 +79,8 @@
         </div>
     </aside>
 
-    <!-- Área de Contenido Principal -->
-    <div class="flex-1 flex flex-col min-w-0 min-h-screen">
+    <!-- Área de Contenido Principal Independiente y Scrolleable -->
+    <div class="flex-1 flex flex-col min-w-0 md:h-screen md:overflow-y-auto">
         <main class="flex-1 p-4 sm:p-6 lg:p-8">
             <div class="max-w-6xl mx-auto">
                 <!-- Mensajes de Estado Flash -->
@@ -99,7 +99,7 @@
                     <div class="mb-6 bg-rose-50 border-l-4 border-rose-500 p-4 rounded-r-lg shadow-xs flex items-center justify-between">
                         <div class="flex items-center">
                             <svg class="w-5 h-5 text-rose-500 mr-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+                                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
                             </svg>
                             <p class="text-sm font-medium text-rose-800">{{ session('error') }}</p>
                         </div>
@@ -111,7 +111,7 @@
         </main>
 
         <!-- Pie de Página -->
-        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 shrink-0">
             <div class="max-w-6xl mx-auto px-4">
                 &copy; {{ date('Y') }} ¿Qué Cocinamos? &bull; Módulo Web Administrativo de Usuarios
             </div>
