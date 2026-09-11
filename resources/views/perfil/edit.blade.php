@@ -7,9 +7,6 @@
     <!-- Encabezado -->
     <div class="pb-5 border-b border-slate-200">
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Mi perfil</h1>
-        <p class="text-sm text-slate-500 mt-1">
-            Administre su información personal y configure sus credenciales de acceso seguro.
-        </p>
     </div>
 
     <!-- Sección 1: Datos Personales (RF-10) -->

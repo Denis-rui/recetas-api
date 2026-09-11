@@ -8,7 +8,6 @@
     <div class="sm:flex sm:items-center sm:justify-between pb-5 border-b border-slate-200">
         <div>
             <h1 class="text-2xl font-bold tracking-tight text-slate-900">Gestión de usuarios</h1>
-            <p class="text-sm text-slate-500 mt-1">Administración de cuentas con búsqueda y filtrado asíncrono en tiempo real.</p>
         </div>
         <div class="mt-4 sm:mt-0">
             <a href="{{ route('usuarios.create') }}" 
