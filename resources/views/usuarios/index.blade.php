@@ -7,17 +7,7 @@
     <!-- Encabezado y Botón Crear -->
     <div class="sm:flex sm:items-center sm:justify-between pb-5 border-b border-slate-200">
         <div>
-            <div class="flex items-center space-x-3">
-                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Gestión de usuarios</h1>
-                <!-- Indicador visual sutil de carga de datos -->
-                <span id="indicador-carga-datos" class="hidden inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                    <svg class="animate-spin -ml-0.5 mr-1.5 h-3.5 w-3.5 text-amber-600" fill="none" viewBox="0 0 24 24">
-                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                    </svg>
-                    Actualizando cuentas...
-                </span>
-            </div>
+            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Gestión de usuarios</h1>
             <p class="text-sm text-slate-500 mt-1">Administración de cuentas con filtrado asíncrono en tiempo real.</p>
         </div>
         <div class="mt-4 sm:mt-0">
@@ -92,35 +82,6 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-sm">
-                    <!-- Skeleton inicial sutil: evita saltos de maquetación en el primer render -->
-                    @for($i = 0; $i < 3; $i++)
-                        <tr class="animate-pulse">
-                            <td class="py-3.5 px-4">
-                                <div class="flex items-center space-x-3">
-                                    <div class="w-10 h-10 rounded-full bg-slate-200 shrink-0"></div>
-                                    <div class="space-y-1.5">
-                                        <div class="h-3.5 bg-slate-200 rounded w-28"></div>
-                                        <div class="h-2.5 bg-slate-100 rounded w-16"></div>
-                                    </div>
-                                </div>
-                            </td>
-                            <td class="py-3.5 px-4">
-                                <div class="h-3.5 bg-slate-200 rounded w-36"></div>
-                            </td>
-                            <td class="py-3.5 px-4">
-                                <div class="h-5 bg-slate-200 rounded-full w-24"></div>
-                            </td>
-                            <td class="py-3.5 px-4">
-                                <div class="h-5 bg-slate-200 rounded-full w-16"></div>
-                            </td>
-                            <td class="py-3.5 px-4 text-right">
-                                <div class="inline-flex space-x-2 justify-end">
-                                    <div class="h-7 bg-slate-200 rounded-lg w-14"></div>
-                                    <div class="h-7 bg-slate-200 rounded-lg w-20"></div>
-                                </div>
-                            </td>
-                        </tr>
-                    @endfor
                 </tbody>
             </table>
         </div>

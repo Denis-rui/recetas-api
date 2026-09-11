@@ -1,8 +1,25 @@
 /* Estilos personalizados para DataTables adaptados a Tailwind CSS */
 
-/* Ocultar el recuadro flotante tosco por defecto de DataTables */
-.dataTables_processing {
-    display: none !important;
+/* Contenedor relativo de DataTables para posicionamiento exacto */
+.dataTables_wrapper {
+    position: relative;
+}
+
+/* Indicador central en la tabla (circulito cargando los datos) */
+div.dataTables_wrapper div.dataTables_processing {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    margin: 0;
+    padding: 0;
+    width: auto;
+    height: auto;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    z-index: 40;
+    pointer-events: none;
 }
 
 /* Transición suave solo en las filas del cuerpo de la tabla */

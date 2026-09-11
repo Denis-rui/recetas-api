@@ -17,6 +17,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class UsuarioController extends Controller
 {
@@ -45,14 +46,21 @@ class UsuarioController extends Controller
     }
 
     /**
-     * Guarda la nueva cuenta en la base de datos.
+     * Guarda la nueva cuenta en la base de datos (201 Created si es JSON, 302 si es Web).
      */
-    public function store(CrearUsuarioRequest $request, CrearCuenta $accion): RedirectResponse
+    public function store(CrearUsuarioRequest $request, CrearCuenta $accion): RedirectResponse|JsonResponse
     {
         $usuario = $accion->ejecutar(
             $request->validated(),
             $request->file('foto_perfil')
         );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => "La cuenta de {$usuario->name} fue creada exitosamente.",
+                'usuario' => $usuario,
+            ], Response::HTTP_CREATED);
+        }
 
         return redirect()->route('usuarios.index')
             ->with('exito', "La cuenta de {$usuario->name} fue creada exitosamente.");
@@ -69,15 +77,22 @@ class UsuarioController extends Controller
     }
 
     /**
-     * Actualiza los datos de la cuenta especificada.
+     * Actualiza los datos de la cuenta especificada (200 OK si es JSON, 302 si es Web).
      */
-    public function update(ActualizarUsuarioRequest $request, User $usuario, ActualizarCuenta $accion): RedirectResponse
+    public function update(ActualizarUsuarioRequest $request, User $usuario, ActualizarCuenta $accion): RedirectResponse|JsonResponse
     {
-        $accion->ejecutar(
+        $usuarioActualizado = $accion->ejecutar(
             $usuario,
             $request->validated(),
             $request->file('foto_perfil')
         );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => 'Los datos de la cuenta fueron actualizados correctamente.',
+                'usuario' => $usuarioActualizado,
+            ], Response::HTTP_OK);
+        }
 
         return redirect()->route('usuarios.index')
             ->with('exito', 'Los datos de la cuenta fueron actualizados correctamente.');
@@ -86,7 +101,7 @@ class UsuarioController extends Controller
     /**
      * Cambia el rol de una cuenta (RF-07, RN-06, RN-07, RN-10).
      */
-    public function cambiarRol(Request $request, User $usuario, CambiarRol $accion): RedirectResponse
+    public function cambiarRol(Request $request, User $usuario, CambiarRol $accion): RedirectResponse|JsonResponse
     {
         $request->validate([
             'rol' => ['required', 'in:administrador,usuario'],
@@ -98,30 +113,56 @@ class UsuarioController extends Controller
         $accion->ejecutar($request->user(), $usuario, $request->input('rol'));
 
         $nombreRol = $usuario->rol === 'administrador' ? 'Administrador' : 'Usuario normal';
+        $mensaje = "El rol de {$usuario->name} ha sido modificado a {$nombreRol}.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => $mensaje,
+                'usuario' => $usuario,
+            ], Response::HTTP_OK);
+        }
 
         return redirect()->route('usuarios.index')
-            ->with('exito', "El rol de {$usuario->name} ha sido modificado a {$nombreRol}.");
+            ->with('exito', $mensaje);
     }
 
     /**
      * Deshabilita una cuenta (RF-08, RN-06, RN-07, RN-08).
      */
-    public function deshabilitar(Request $request, User $usuario, DeshabilitarCuenta $accion): RedirectResponse
+    public function deshabilitar(Request $request, User $usuario, DeshabilitarCuenta $accion): RedirectResponse|JsonResponse
     {
         $accion->ejecutar($request->user(), $usuario);
 
+        $mensaje = "La cuenta de {$usuario->name} ha sido deshabilitada.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => $mensaje,
+                'usuario' => $usuario,
+            ], Response::HTTP_OK);
+        }
+
         return redirect()->route('usuarios.index')
-            ->with('exito', "La cuenta de {$usuario->name} ha sido deshabilitada.");
+            ->with('exito', $mensaje);
     }
 
     /**
      * Reactiva una cuenta deshabilitada (RF-09, RN-09).
      */
-    public function reactivar(Request $request, User $usuario, ReactivarCuenta $accion): RedirectResponse
+    public function reactivar(Request $request, User $usuario, ReactivarCuenta $accion): RedirectResponse|JsonResponse
     {
         $accion->ejecutar($request->user(), $usuario);
 
+        $mensaje = "La cuenta de {$usuario->name} ha sido reactivada.";
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => $mensaje,
+                'usuario' => $usuario,
+            ], Response::HTTP_OK);
+        }
+
         return redirect()->route('usuarios.index')
-            ->with('exito', "La cuenta de {$usuario->name} ha sido reactivada.");
+            ->with('exito', $mensaje);
     }
 }

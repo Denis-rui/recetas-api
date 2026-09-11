@@ -7,9 +7,11 @@ use App\Actions\Usuarios\CambiarPassword;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Perfil\ActualizarPerfilRequest;
 use App\Http\Requests\Perfil\CambiarPasswordRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class PerfilController extends Controller
 {
@@ -24,29 +26,42 @@ class PerfilController extends Controller
     }
 
     /**
-     * Actualiza los datos personales del administrador autenticado.
+     * Actualiza los datos personales del administrador autenticado (200 OK si es JSON, 302 si es Web).
      */
-    public function update(ActualizarPerfilRequest $request, ActualizarPerfil $accion): RedirectResponse
+    public function update(ActualizarPerfilRequest $request, ActualizarPerfil $accion): RedirectResponse|JsonResponse
     {
-        $accion->ejecutar(
+        $usuario = $accion->ejecutar(
             $request->user(),
             $request->validated(),
             $request->file('foto_perfil')
         );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => 'Sus datos personales han sido actualizados exitosamente.',
+                'usuario' => $usuario,
+            ], Response::HTTP_OK);
+        }
 
         return redirect()->route('perfil.edit')
             ->with('exito_perfil', 'Sus datos personales han sido actualizados exitosamente.');
     }
 
     /**
-     * Actualiza la contraseña del administrador autenticado.
+     * Actualiza la contraseña del administrador autenticado (200 OK si es JSON, 302 si es Web).
      */
-    public function cambiarPassword(CambiarPasswordRequest $request, CambiarPassword $accion): RedirectResponse
+    public function cambiarPassword(CambiarPasswordRequest $request, CambiarPassword $accion): RedirectResponse|JsonResponse
     {
         $accion->ejecutar(
             $request->user(),
             $request->validated('password')
         );
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'mensaje' => 'Su contraseña ha sido cambiada exitosamente.',
+            ], Response::HTTP_OK);
+        }
 
         return redirect()->route('perfil.edit')
             ->with('exito_password', 'Su contraseña ha sido cambiada exitosamente.');

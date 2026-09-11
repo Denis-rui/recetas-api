@@ -285,3 +285,43 @@ test('deshabilitar una cuenta invalida sus sesiones web activas en la base de da
 
     $this->assertDatabaseMissing('sessions', ['user_id' => $otro->id]);
 });
+
+test('los endpoints responden con codigos HTTP semanticos adecuados (201 Created, 200 OK, 422 Unprocessable, 302 Found)', function () {
+    // 1. Petición JSON de creación exitosa debe responder 201 Created
+    $respCrearJson = $this->actingAs($this->admin)->postJson(route('usuarios.store'), [
+        'name' => 'Usuario API',
+        'email' => 'api.creado@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'password_confirmation' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+    ]);
+    $respCrearJson->assertStatus(201); // Response::HTTP_CREATED
+    $respCrearJson->assertJsonPath('usuario.email', 'api.creado@quecocinamos.com');
+
+    // 2. Error de validación con JSON debe responder 422 Unprocessable Entity
+    $respErrorJson = $this->actingAs($this->admin)->postJson(route('usuarios.store'), [
+        'name' => '',
+        'email' => 'correo-invalido',
+        'password' => 'corta',
+        'rol' => 'rol_inexistente',
+    ]);
+    $respErrorJson->assertStatus(422); // Response::HTTP_UNPROCESSABLE_ENTITY
+
+    // 3. Petición web tradicional de formulario debe responder 302 Found (Post/Redirect/Get)
+    $respWeb = $this->actingAs($this->admin)->post(route('usuarios.store'), [
+        'name' => 'Usuario Formulario Web',
+        'email' => 'web.creado@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'password_confirmation' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+    ]);
+    $respWeb->assertStatus(302); // Response::HTTP_FOUND
+
+    // 4. Actualización JSON exitosa debe responder 200 OK
+    $usuarioCreado = User::where('email', 'api.creado@quecocinamos.com')->first();
+    $respUpdateJson = $this->actingAs($this->admin)->putJson(route('usuarios.update', $usuarioCreado), [
+        'name' => 'Usuario API Actualizado',
+        'email' => 'api.creado@quecocinamos.com',
+    ]);
+    $respUpdateJson->assertStatus(200); // Response::HTTP_OK
+});
