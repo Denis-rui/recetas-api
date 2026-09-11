@@ -94,26 +94,26 @@ class ConsultarCuentasDataTable
             // Columna 0: Usuario (Avatar o iniciales + Nombre + ID)
             $avatarHtml = '';
             if ($u->foto_perfil) {
-                $urlFoto = asset('storage/' . $u->foto_perfil);
-                $avatarHtml = '<img src="' . e($urlFoto) . '" alt="' . e($u->name) . '" class="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0">';
+                $urlFoto = asset('storage/'.$u->foto_perfil);
+                $avatarHtml = '<img src="'.e($urlFoto).'" alt="'.e($u->name).'" class="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0">';
             } else {
-                $avatarHtml = '<div class="w-10 h-10 rounded-full bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center border border-amber-200 shrink-0">' . e($u->iniciales) . '</div>';
+                $avatarHtml = '<div class="w-10 h-10 rounded-full bg-amber-100 text-amber-800 font-bold text-xs flex items-center justify-center border border-amber-200 shrink-0">'.e($u->iniciales).'</div>';
             }
 
             $badgeTu = $esPropiaCuenta
                 ? '<span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Tú</span>'
                 : '';
 
-            $columnaUsuario = '<div class="flex items-center space-x-3">' .
-                $avatarHtml .
-                '<div>' .
-                    '<div class="font-semibold text-slate-900 text-sm flex items-center">' . e($u->name) . $badgeTu . '</div>' .
-                    '<div class="text-xs text-slate-400">ID: #' . $u->id . '</div>' .
-                '</div>' .
+            $columnaUsuario = '<div class="flex items-center space-x-3">'.
+                $avatarHtml.
+                '<div>'.
+                    '<div class="font-semibold text-slate-900 text-sm flex items-center">'.e($u->name).$badgeTu.'</div>'.
+                    '<div class="text-xs text-slate-400">ID: #'.$u->id.'</div>'.
+                '</div>'.
             '</div>';
 
             // Columna 1: Correo electrónico
-            $columnaEmail = '<span class="text-sm text-slate-600">' . e($u->email) . '</span>';
+            $columnaEmail = '<span class="text-sm text-slate-600">'.e($u->email).'</span>';
 
             // Columna 2: Rol
             if ($u->rol === 'administrador') {
@@ -124,17 +124,17 @@ class ConsultarCuentasDataTable
 
             // Columna 3: Estado
             if ($u->activo) {
-                $columnaEstado = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">' .
+                $columnaEstado = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">'.
                     '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>Activo</span>';
             } else {
-                $columnaEstado = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">' .
+                $columnaEstado = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">'.
                     '<span class="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5"></span>Deshabilitado</span>';
             }
 
             // Columna 4: Acciones protegidas (RN-06, RN-07)
             $urlEditar = route('usuarios.edit', $u);
-            $accionesHtml = '<div class="flex items-center justify-end space-x-2">' .
-                '<a href="' . e($urlEditar) . '" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 transition" title="Editar cuenta">Editar</a>';
+            $accionesHtml = '<div class="flex items-center justify-end space-x-2">'.
+                '<a href="'.e($urlEditar).'" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 transition" title="Editar cuenta">Editar</a>';
 
             if ($esPropiaCuenta) {
                 $accionesHtml .= '<span class="text-xs text-slate-400 italic px-2">Cuenta protegida</span>';
@@ -144,27 +144,27 @@ class ConsultarCuentasDataTable
                 $textoBotonRol = ($u->rol === 'administrador') ? 'Hacer Usuario normal' : 'Hacer Administrador';
                 $urlCambiarRol = route('usuarios.cambiar-rol', $u);
 
-                $accionesHtml .= '<form method="POST" action="' . e($urlCambiarRol) . '" class="inline" onsubmit="return confirm(\'¿Confirma que desea cambiar el rol de ' . e(addslashes($u->name)) . '?\');">' .
-                    '<input type="hidden" name="_token" value="' . $csrfToken . '">' .
-                    '<input type="hidden" name="_method" value="PATCH">' .
-                    '<input type="hidden" name="rol" value="' . $nuevoRol . '">' .
-                    '<button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition cursor-pointer">' . $textoBotonRol . '</button>' .
+                $accionesHtml .= '<form method="POST" action="'.e($urlCambiarRol).'" class="inline" onsubmit="return confirm(\'¿Confirma que desea cambiar el rol de '.e(addslashes($u->name)).'?\');">'.
+                    '<input type="hidden" name="_token" value="'.$csrfToken.'">'.
+                    '<input type="hidden" name="_method" value="PATCH">'.
+                    '<input type="hidden" name="rol" value="'.$nuevoRol.'">'.
+                    '<button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 transition cursor-pointer">'.$textoBotonRol.'</button>'.
                 '</form>';
 
                 // Botón Deshabilitar o Reactivar (RF-08, RF-09)
                 if ($u->activo) {
                     $urlDeshabilitar = route('usuarios.deshabilitar', $u);
-                    $accionesHtml .= '<form method="POST" action="' . e($urlDeshabilitar) . '" class="inline" onsubmit="return confirm(\'¿Está seguro de deshabilitar la cuenta de ' . e(addslashes($u->name)) . '? Esta acción cerrará sus sesiones y bloqueará su acceso.\');">' .
-                        '<input type="hidden" name="_token" value="' . $csrfToken . '">' .
-                        '<input type="hidden" name="_method" value="PATCH">' .
-                        '<button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer">Deshabilitar</button>' .
+                    $accionesHtml .= '<form method="POST" action="'.e($urlDeshabilitar).'" class="inline" onsubmit="return confirm(\'¿Está seguro de deshabilitar la cuenta de '.e(addslashes($u->name)).'? Esta acción cerrará sus sesiones y bloqueará su acceso.\');">'.
+                        '<input type="hidden" name="_token" value="'.$csrfToken.'">'.
+                        '<input type="hidden" name="_method" value="PATCH">'.
+                        '<button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition cursor-pointer">Deshabilitar</button>'.
                     '</form>';
                 } else {
                     $urlReactivar = route('usuarios.reactivar', $u);
-                    $accionesHtml .= '<form method="POST" action="' . e($urlReactivar) . '" class="inline" onsubmit="return confirm(\'¿Desea reactivar la cuenta de ' . e(addslashes($u->name)) . '?\');">' .
-                        '<input type="hidden" name="_token" value="' . $csrfToken . '">' .
-                        '<input type="hidden" name="_method" value="PATCH">' .
-                        '<button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer">Reactivar</button>' .
+                    $accionesHtml .= '<form method="POST" action="'.e($urlReactivar).'" class="inline" onsubmit="return confirm(\'¿Desea reactivar la cuenta de '.e(addslashes($u->name)).'?\');">'.
+                        '<input type="hidden" name="_token" value="'.$csrfToken.'">'.
+                        '<input type="hidden" name="_method" value="PATCH">'.
+                        '<button type="submit" class="inline-flex items-center px-2.5 py-1.5 text-xs font-medium rounded-lg text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition cursor-pointer">Reactivar</button>'.
                     '</form>';
                 }
             }
@@ -188,4 +188,3 @@ class ConsultarCuentasDataTable
         ];
     }
 }
-

@@ -1,0 +1,92 @@
+/* Estilos personalizados para DataTables adaptados a Tailwind CSS */
+
+/* Ocultar el recuadro flotante tosco por defecto de DataTables */
+.dataTables_processing {
+    display: none !important;
+}
+
+/* Transición suave solo en las filas del cuerpo de la tabla */
+#tabla-usuarios tbody {
+    transition: opacity 0.2s ease-in-out;
+}
+
+/* Personalización visual de controles con Tailwind */
+.dataTables_wrapper .dataTables_length,
+.dataTables_wrapper .dataTables_filter {
+    margin-bottom: 1.25rem;
+}
+
+.dataTables_wrapper .dataTables_length label,
+.dataTables_wrapper .dataTables_filter label {
+    font-size: 0.875rem;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    border-radius: 0.5rem;
+    border: 1px solid #cbd5e1;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    background-color: #f8fafc;
+    outline: none;
+}
+
+.dataTables_wrapper .dataTables_filter input {
+    border-radius: 0.5rem;
+    border: 1px solid #cbd5e1;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    width: 16rem;
+    outline: none;
+    transition: all 0.2s;
+}
+
+.dataTables_wrapper .dataTables_filter input:focus {
+    border-color: #f59e0b;
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
+}
+
+.dataTables_wrapper .dataTables_info {
+    font-size: 0.875rem;
+    color: #64748b;
+    padding-top: 1rem;
+}
+
+.dataTables_wrapper .dataTables_paginate {
+    padding-top: 1rem;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.25rem;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+    color: #334155 !important;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+    background: #f1f5f9 !important;
+    color: #0f172a !important;
+    border-color: #cbd5e1;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.current {
+    background: #f59e0b !important;
+    color: #ffffff !important;
+    border-color: #f59e0b !important;
+    font-weight: 600;
+}
+
+.dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}

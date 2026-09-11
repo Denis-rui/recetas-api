@@ -7,7 +7,18 @@
     <!-- Encabezado y Botón Crear -->
     <div class="sm:flex sm:items-center sm:justify-between pb-5 border-b border-slate-200">
         <div>
-            <h1 class="text-2xl font-bold tracking-tight text-slate-900">Gestión de usuarios</h1>
+            <div class="flex items-center space-x-3">
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">Gestión de usuarios</h1>
+                <!-- Indicador visual sutil de carga de datos -->
+                <span id="indicador-carga-datos" class="hidden inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                    <svg class="animate-spin -ml-0.5 mr-1.5 h-3.5 w-3.5 text-amber-600" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    Actualizando cuentas...
+                </span>
+            </div>
+            <p class="text-sm text-slate-500 mt-1">Administración de cuentas con filtrado asíncrono en tiempo real.</p>
         </div>
         <div class="mt-4 sm:mt-0">
             <a href="{{ route('usuarios.create') }}" 
@@ -63,10 +74,14 @@
         </div>
     </div>
 
-    <!-- Contenedor de la Tabla DataTables Server-Side -->
+    <!-- Contenedor Estable de la Tabla DataTables Server-Side -->
     <div class="bg-white rounded-xl border border-slate-200 shadow-xs p-6 overflow-hidden">
-        <div class="overflow-x-auto">
-            <table id="tabla-usuarios" class="w-full text-left border-collapse" style="width:100%">
+        <div class="overflow-x-auto min-h-[360px]">
+            <table id="tabla-usuarios" 
+                   data-url="{{ route('usuarios.index') }}" 
+                   data-login-url="{{ route('login') }}" 
+                   class="w-full text-left border-collapse" 
+                   style="width:100%">
                 <thead>
                     <tr class="border-b border-slate-200 bg-slate-50/80 text-slate-700">
                         <th class="py-3.5 px-4 text-xs font-semibold uppercase tracking-wider">Usuario</th>
@@ -77,183 +92,38 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-sm">
-                    <!-- DataTables cargará las filas de forma asíncrona -->
+                    <!-- Skeleton inicial sutil: evita saltos de maquetación en el primer render -->
+                    @for($i = 0; $i < 3; $i++)
+                        <tr class="animate-pulse">
+                            <td class="py-3.5 px-4">
+                                <div class="flex items-center space-x-3">
+                                    <div class="w-10 h-10 rounded-full bg-slate-200 shrink-0"></div>
+                                    <div class="space-y-1.5">
+                                        <div class="h-3.5 bg-slate-200 rounded w-28"></div>
+                                        <div class="h-2.5 bg-slate-100 rounded w-16"></div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <div class="h-3.5 bg-slate-200 rounded w-36"></div>
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <div class="h-5 bg-slate-200 rounded-full w-24"></div>
+                            </td>
+                            <td class="py-3.5 px-4">
+                                <div class="h-5 bg-slate-200 rounded-full w-16"></div>
+                            </td>
+                            <td class="py-3.5 px-4 text-right">
+                                <div class="inline-flex space-x-2 justify-end">
+                                    <div class="h-7 bg-slate-200 rounded-lg w-14"></div>
+                                    <div class="h-7 bg-slate-200 rounded-lg w-20"></div>
+                                </div>
+                            </td>
+                        </tr>
+                    @endfor
                 </tbody>
             </table>
         </div>
     </div>
 </div>
-
-<!-- Estilos para integrar DataTables con la estética de la aplicación -->
-<style>
-    /* Personalización visual de DataTables con Tailwind */
-    .dataTables_wrapper .dataTables_length,
-    .dataTables_wrapper .dataTables_filter {
-        margin-bottom: 1.25rem;
-    }
-    .dataTables_wrapper .dataTables_length label,
-    .dataTables_wrapper .dataTables_filter label {
-        font-size: 0.875rem;
-        color: #475569;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .dataTables_wrapper .dataTables_length select {
-        border-radius: 0.5rem;
-        border: 1px solid #cbd5e1;
-        padding: 0.35rem 0.75rem;
-        font-size: 0.875rem;
-        background-color: #f8fafc;
-        outline: none;
-    }
-    .dataTables_wrapper .dataTables_filter input {
-        border-radius: 0.5rem;
-        border: 1px solid #cbd5e1;
-        padding: 0.35rem 0.75rem;
-        font-size: 0.875rem;
-        width: 16rem;
-        outline: none;
-        transition: all 0.2s;
-    }
-    .dataTables_wrapper .dataTables_filter input:focus {
-        border-color: #f59e0b;
-        box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2);
-    }
-    .dataTables_wrapper .dataTables_info {
-        font-size: 0.875rem;
-        color: #64748b;
-        padding-top: 1rem;
-    }
-    .dataTables_wrapper .dataTables_paginate {
-        padding-top: 1rem;
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.25rem;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button {
-        padding: 0.35rem 0.75rem;
-        font-size: 0.875rem;
-        border-radius: 0.5rem;
-        border: 1px solid #e2e8f0;
-        background: #ffffff;
-        color: #334155 !important;
-        cursor: pointer;
-        transition: all 0.15s;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
-        background: #f1f5f9 !important;
-        color: #0f172a !important;
-        border-color: #cbd5e1;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button.current {
-        background: #f59e0b !important;
-        color: #ffffff !important;
-        border-color: #f59e0b !important;
-        font-weight: 600;
-    }
-    .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
-        opacity: 0.5;
-        cursor: not-allowed;
-    }
-    .dataTables_wrapper .dataTables_processing {
-        background: rgba(255, 255, 255, 0.85);
-        border: 1px solid #f1f5f9;
-        border-radius: 0.75rem;
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-    }
-</style>
-
-<!-- Inclusión de jQuery y DataTables CDN -->
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdn.datatables.net/1.13.8/js/jquery.dataTables.min.js"></script>
-
-<script>
-$(document).ready(function() {
-    let peticionAjaxEnCurso = null;
-
-    // Inicialización de DataTables en modo Server-Side
-    const tabla = $('#tabla-usuarios').DataTable({
-        serverSide: true,
-        processing: true,
-        searchDelay: 400, // Regla de rendimiento: Anti-rebote (debounce de 400 ms)
-        ajax: {
-            url: "{{ route('usuarios.index') }}",
-            type: "GET",
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content'),
-                'Accept': 'application/json'
-            },
-            data: function(d) {
-                // Incorporar filtros asíncronos adicionales en la petición
-                d.filtro_rol = $('#filtro_rol').val();
-                d.filtro_estado = $('#filtro_estado').val();
-            },
-            beforeSend: function(jqXHR) {
-                // Regla de rendimiento: Cancelar petición obsoleta si aún está en vuelo
-                if (peticionAjaxEnCurso && peticionAjaxEnCurso.readyState !== 4) {
-                    peticionAjaxEnCurso.abort();
-                }
-                peticionAjaxEnCurso = jqXHR;
-            },
-            error: function(xhr, status, error) {
-                if (status === 'abort') {
-                    // Petición cancelada intencionalmente por debounce; no es un error
-                    return;
-                }
-                // Si la sesión expiró o la cuenta fue deshabilitada en tiempo real
-                if (xhr.status === 401 || xhr.status === 403) {
-                    window.location.href = "{{ route('login') }}";
-                } else {
-                    console.error("Error al obtener cuentas:", error);
-                }
-            }
-        },
-        columns: [
-            { data: 0, orderable: true, className: "py-3.5 px-4" },
-            { data: 1, orderable: true, className: "py-3.5 px-4" },
-            { data: 2, orderable: true, className: "py-3.5 px-4" },
-            { data: 3, orderable: true, className: "py-3.5 px-4" },
-            { data: 4, orderable: false, className: "py-3.5 px-4 text-right" } // Columna de acciones no ordenable
-        ],
-        order: [[4, 'desc']], // Ordenar inicialmente por ID descendente
-        lengthMenu: [10, 25, 50], // Opciones de paginación controladas
-        pageLength: 10,
-        language: {
-            processing: '<div class="flex items-center justify-center py-4 text-amber-600 font-medium text-sm"><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg> Cargando cuentas...</div>',
-            search: "Buscar:",
-            searchPlaceholder: "Nombre o correo...",
-            lengthMenu: "Mostrar _MENU_ cuentas",
-            info: "Mostrando _START_ a _END_ de _TOTAL_ cuentas",
-            infoEmpty: "No hay cuentas disponibles",
-            infoFiltered: "(filtrado de un total de _MAX_ cuentas)",
-            zeroRecords: "No se encontraron cuentas que coincidan con la búsqueda.",
-            emptyTable: "No existen cuentas registradas en el sistema.",
-            paginate: {
-                first: "Primero",
-                previous: "Anterior",
-                next: "Siguiente",
-                last: "Último"
-            }
-        }
-    });
-
-    // Recargar tabla de forma asíncrona cuando cambie el filtro de Rol
-    $('#filtro_rol').on('change', function() {
-        tabla.ajax.reload();
-    });
-
-    // Recargar tabla de forma asíncrona cuando cambie el filtro de Estado
-    $('#filtro_estado').on('change', function() {
-        tabla.ajax.reload();
-    });
-
-    // Botón para restablecer filtros
-    $('#btn-limpiar-filtros').on('click', function() {
-        $('#filtro_rol').val('');
-        $('#filtro_estado').val('');
-        tabla.search('').draw();
-    });
-});
-</script>
 @endsection
