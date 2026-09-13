@@ -474,3 +474,237 @@ test('si falla unicamente la eliminacion de la foto anterior tras guardar la nue
     expect($otro->foto_perfil)->not->toBe('perfiles/foto_antigua_otro.jpg')
         ->and(Storage::disk('public')->exists($otro->foto_perfil))->toBeTrue();
 });
+
+test('el rate limiter de consultas asincronas devuelve 429 al superarse y es independiente para cada administrador', function () {
+    $limiteOriginal = config('usuarios.rate_limit', 60);
+    config(['usuarios.rate_limit' => 3]);
+
+    $adminDos = User::create([
+        'name' => 'Segundo Administrador',
+        'email' => 'admin.dos@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'administrador',
+        'activo' => true,
+    ]);
+
+    try {
+        // Admin 1 realiza 3 peticiones exitosas (límite configurado a 3)
+        for ($i = 0; $i < 3; $i++) {
+            $resp = $this->actingAs($this->admin)->withServerVariables(['REMOTE_ADDR' => '192.168.1.100'])->getJson(route('usuarios.index'));
+            $resp->assertStatus(200);
+        }
+
+        // Petición 4 de Admin 1 debe recibir 429 Too Many Requests con cabecera Retry-After
+        $resp429 = $this->actingAs($this->admin)->withServerVariables(['REMOTE_ADDR' => '192.168.1.100'])->getJson(route('usuarios.index'));
+        $resp429->assertStatus(429);
+        $this->assertNotEmpty($resp429->headers->get('Retry-After'));
+        $resp429->assertJsonStructure(['message', 'retry_after']);
+
+        // Admin 2, utilizando la MISMA IP que Admin 1, no comparte el límite y puede consultar exitosamente
+        $respAdminDos = $this->actingAs($adminDos)->withServerVariables(['REMOTE_ADDR' => '192.168.1.100'])->getJson(route('usuarios.index'));
+        $respAdminDos->assertStatus(200);
+
+        // Operaciones distintas al listado asíncrono (como editar cuenta) no son afectadas por este límite
+        $respEditar = $this->actingAs($this->admin)->get(route('usuarios.edit', $adminDos));
+        $respEditar->assertStatus(200);
+    } finally {
+        config(['usuarios.rate_limit' => $limiteOriginal]);
+        RateLimiter::clear('admin_'.$this->admin->id);
+        RateLimiter::clear('admin_'.$adminDos->id);
+    }
+});
+
+test('las solicitudes de busqueda vacias, de un caracter y de dos o mas caracteres cumplen las reglas', function () {
+    User::create([
+        'name' => 'José Ñandú',
+        'email' => 'jose.nandu@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    // 1. Búsqueda vacía (o sólo espacios) devuelve listado normal con 200
+    $respVacia = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => '   '],
+    ]));
+    $respVacia->assertStatus(200);
+    $respVacia->assertJsonPath('recordsTotal', 2);
+    $respVacia->assertJsonPath('recordsFiltered', 2);
+
+    // 2. Búsqueda de 1 carácter alfanumérico devuelve 422 Unprocessable Entity con validación
+    $respUnChar = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => 'J'],
+    ]));
+    $respUnChar->assertStatus(422);
+    $respUnChar->assertJsonValidationErrors('search');
+    $this->assertStringContainsString('Escribe al menos 2 caracteres para buscar.', $respUnChar->json('errors.search.0'));
+
+    // 3. Búsqueda de 1 carácter acentuado tras trim devuelve 422
+    $respAcentoUnChar = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => '  é  '],
+    ]));
+    $respAcentoUnChar->assertStatus(422);
+    $respAcentoUnChar->assertJsonValidationErrors('search');
+
+    // 4. Búsqueda de 2 caracteres con caracteres acentuados/multibyte ("Ña") tras trim devuelve 200 y filtra
+    $respDosChars = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => '  Ña  '],
+    ]));
+    $respDosChars->assertStatus(200);
+    $respDosChars->assertJsonPath('recordsFiltered', 1);
+    $this->assertStringContainsString('José Ñandú', json_encode($respDosChars->json('data'), JSON_UNESCAPED_UNICODE));
+
+    // 5. Búsqueda que supere 100 caracteres devuelve 422
+    $respExceso = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => str_repeat('a', 101)],
+    ]));
+    $respExceso->assertStatus(422);
+    $respExceso->assertJsonValidationErrors('search');
+});
+
+test('los comodines SQL %, _ y el caracter de escape ! se interpretan literalmente en la busqueda', function () {
+    User::create([
+        'name' => 'Usuario Con%Porcentaje',
+        'email' => 'con.porcentaje@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    User::create([
+        'name' => 'Usuario Con_GuionBajo',
+        'email' => 'con.guionbajo@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    User::create([
+        'name' => 'Usuario Con!Exclamacion',
+        'email' => 'con.exclamacion@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    User::create([
+        'name' => 'Usuario ConXComodin',
+        'email' => 'con.comodin@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    // Búsqueda literal de "%" (con 2 caracteres: "Con%") debe coincidir solo con Usuario Con%Porcentaje
+    $respPorcentaje = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => 'Con%'],
+    ]));
+    $respPorcentaje->assertStatus(200);
+    $respPorcentaje->assertJsonPath('recordsFiltered', 1);
+    $this->assertStringContainsString('Usuario Con%Porcentaje', json_encode($respPorcentaje->json('data')));
+    $this->assertStringNotContainsString('Usuario ConXComodin', json_encode($respPorcentaje->json('data')));
+
+    // Búsqueda literal de "_" ("Con_") debe coincidir solo con Usuario Con_GuionBajo
+    $respGuionBajo = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => 'Con_'],
+    ]));
+    $respGuionBajo->assertStatus(200);
+    $respGuionBajo->assertJsonPath('recordsFiltered', 1);
+    $this->assertStringContainsString('Usuario Con_GuionBajo', json_encode($respGuionBajo->json('data')));
+    $this->assertStringNotContainsString('Usuario ConXComodin', json_encode($respGuionBajo->json('data')));
+
+    // Búsqueda literal del carácter de escape "!" ("Con!") debe coincidir solo con Usuario Con!Exclamacion
+    $respExclamacion = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => 'Con!'],
+    ]));
+    $respExclamacion->assertStatus(200);
+    $respExclamacion->assertJsonPath('recordsFiltered', 1);
+    $this->assertStringContainsString('Usuario Con!Exclamacion', json_encode($respExclamacion->json('data')));
+    $this->assertStringNotContainsString('Usuario ConXComodin', json_encode($respExclamacion->json('data')));
+});
+
+test('sin filtros efectivos se evita la consulta de conteo redundante', function () {
+    User::create([
+        'name' => 'Usuario Conteo Uno',
+        'email' => 'conteo.uno@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    // 1. Petición SIN filtros efectivos: solo debe realizar 1 consulta SELECT COUNT(*)
+    $conteoSinFiltros = 0;
+    DB::listen(function ($query) use (&$conteoSinFiltros) {
+        if (str_contains(strtolower($query->sql), 'count(')) {
+            $conteoSinFiltros++;
+        }
+    });
+
+    $respSinFiltro = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'draw' => 1,
+        'start' => 0,
+        'length' => 10,
+        'search' => ['value' => ''],
+        'filtro_rol' => '',
+        'filtro_estado' => '',
+    ]));
+
+    $respSinFiltro->assertStatus(200);
+    $respSinFiltro->assertJsonPath('recordsTotal', 2);
+    $respSinFiltro->assertJsonPath('recordsFiltered', 2);
+    expect($conteoSinFiltros)->toBe(1);
+
+    // 2. Petición CON filtro de rol: se ejecuta el conteo total y el conteo filtrado (2 count)
+    $conteoConFiltro = 0;
+    DB::listen(function ($query) use (&$conteoConFiltro) {
+        if (str_contains(strtolower($query->sql), 'count(')) {
+            $conteoConFiltro++;
+        }
+    });
+
+    $respConFiltro = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'filtro_rol' => 'usuario',
+    ]));
+
+    $respConFiltro->assertStatus(200);
+    $respConFiltro->assertJsonPath('recordsTotal', 2);
+    $respConFiltro->assertJsonPath('recordsFiltered', 1);
+    expect($conteoConFiltro)->toBeGreaterThanOrEqual(2);
+});
+
+test('la consulta de filas para datatables selecciona estrictamente las columnas necesarias sin exponer campos sensibles', function () {
+    User::create([
+        'name' => 'Usuario Columnas',
+        'email' => 'columnas@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    $queriesSql = [];
+    DB::listen(function ($query) use (&$queriesSql) {
+        if (str_starts_with(strtolower(trim($query->sql)), 'select') && ! str_contains(strtolower($query->sql), 'count(')) {
+            $queriesSql[] = $query->sql;
+        }
+    });
+
+    $response = $this->actingAs($this->admin)->getJson(route('usuarios.index', [
+        'search' => ['value' => 'Columnas'],
+    ]));
+
+    $response->assertStatus(200);
+
+    $querySeleccion = collect($queriesSql)->first(fn ($sql) => str_contains($sql, 'from "users"') || str_contains($sql, 'from `users`'));
+    expect($querySeleccion)->not->toBeNull();
+    $sqlLower = strtolower($querySeleccion);
+
+    expect($sqlLower)->toContain('id')
+        ->toContain('name')
+        ->toContain('email')
+        ->toContain('rol')
+        ->toContain('activo')
+        ->toContain('foto_perfil');
+
+    expect($sqlLower)->not->toContain('password')
+        ->not->toContain('remember_token');
+});

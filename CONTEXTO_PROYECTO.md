@@ -35,11 +35,11 @@ Facilitar la búsqueda y consulta de recetas mediante un catálogo organizado, c
 
 ## 3. Tipos de usuario y acceso
 
-| Tipo de usuario      | Acceso y funciones acordadas                                                                                                 |
-| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| Invitado o visitante | Ingresa sin cuenta. Puede explorar, buscar, seleccionar ingredientes, filtrar y guardar favoritos en el dispositivo.         |
+| Tipo de usuario      | Acceso y funciones acordadas                                                                                                                                                                                                  |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Invitado o visitante | Ingresa sin cuenta. Puede explorar, buscar, seleccionar ingredientes, filtrar y guardar favoritos en el dispositivo.                                                                                                          |
 | Usuario registrado   | Tiene las funciones de consulta del invitado, favoritos vinculados a su cuenta, edición de perfil, borradores locales, recetas privadas en su cuenta, envío de recetas a revisión, eliminación de sus recetas y valoraciones. |
-| Administrador        | Cuando decide publicar una receta propia, lo hace directamente desde la app. Accede a la web para gestionar cuentas y revisar recetas y modificaciones enviadas por usuarios. También puede valorar recetas. |
+| Administrador        | Cuando decide publicar una receta propia, lo hace directamente desde la app. Accede a la web para gestionar cuentas y revisar recetas y modificaciones enviadas por usuarios. También puede valorar recetas.                  |
 
 La consulta del catálogo no debe exigir registro. Las operaciones administrativas sí requieren acceso autorizado. La web es exclusiva para administradores activos. Los invitados no publican ni valoran recetas.
 
@@ -183,6 +183,14 @@ La web será exclusiva para administradores activos y permitirá:
 - Invalidar las sesiones existentes y bloquear nuevos accesos autenticados al deshabilitar. Reactivar exige iniciar una nueva sesión; no recupera las anteriores. La regla también deberá aplicarse a la API móvil cuando se implemente.
 - Editar el perfil propio: nombre, correo único y foto; cambiar la contraseña propia solicitando la contraseña actual y la confirmación de la nueva.
 
+#### Reglas aprobadas para el listado asíncrono y búsqueda de cuentas (DataTables)
+
+- **Límite de solicitudes asíncronas:** Se aplica un rate limiting de 60 consultas por minuto identificado por el administrador autenticado, evitando cuotas compartidas entre administradores que utilicen una misma IP. Al superarse el límite, responde HTTP 429 con cabecera `Retry-After`; en la interfaz se muestra un aviso con cuenta regresiva y opción de reintento manual sin recargar la página ni generar bucles. Las operaciones de edición, perfil y cierre de sesión no se ven afectadas por este límite.
+- **Umbral mínimo de búsqueda:** La búsqueda textual requiere al menos 2 caracteres después de quitar espacios iniciales y finales, respetando caracteres acentuados y eñes (máximo 100 caracteres). Si se introduce 1 carácter, no se envía solicitud al servidor y se muestra «Escribe al menos 2 caracteres para buscar» (indicando si los resultados mostrados corresponden a una consulta anterior). Se valida igualmente en el servidor respondiendo HTTP 422 Unprocessable Entity. Se garantiza un debounce real de 400 ms desde la última pulsación antes de buscar.
+- **Comodines literales en búsquedas SQL:** Los caracteres `%`, `_` y el delimitador de escape (`!`) se interpretan como texto literal introducido por el administrador, mediante parámetros enlazados y la cláusula SQL explícita `ESCAPE '!'`.
+- **Optimización de conteos:** Cuando no se apliquen filtros efectivos de búsqueda, rol o estado, se reutiliza el total general como total filtrado (`recordsFiltered = recordsTotal`), evitando ejecutar una segunda consulta `COUNT(*)` redundante.
+- **Proyección de columnas estrictamente necesarias:** La consulta recupera únicamente `id`, `name`, `email`, `rol`, `activo` y `foto_perfil`, sin transferir contraseñas, tokens de recordatorio ni metadatos innecesarios para el renderizado del listado.
+
 Un administrador no podrá deshabilitarse ni cambiar su propio rol desde ninguna pantalla o solicitud. Estas restricciones se aplican también desde la gestión de cuentas, no solo desde Mi perfil.
 
 La web tendrá además el módulo de revisión de recetas de la sección 4.9. Esto amplía el alcance anterior de administración exclusiva de cuentas; no implica trasladar a la web el formulario móvil de creación de recetas.
@@ -195,10 +203,10 @@ Antes de aprobar, se comprobará que el autor siga activo y la solicitud contin�
 
 #### Comparación de contenidos
 
-| Revisión | Lado izquierdo | Lado derecho |
-| --- | --- | --- |
-| Corrección de una receta publicada | Versión publicada | Modificación pendiente de aprobación |
-| Alerta de posible duplicado | Receta similar encontrada | Receta que se está revisando |
+| Revisión                           | Lado izquierdo            | Lado derecho                         |
+| ---------------------------------- | ------------------------- | ------------------------------------ |
+| Corrección de una receta publicada | Versión publicada         | Modificación pendiente de aprobación |
+| Alerta de posible duplicado        | Receta similar encontrada | Receta que se está revisando         |
 
 Si hay varias coincidencias, flechas permitirán recorrerlas en el lado izquierdo, con un indicador de posición como «2 de 5». El contenido de la derecha permanece fijo. Se resaltarán los campos modificados al comparar una corrección con su versión publicada.
 
@@ -216,12 +224,12 @@ Si hay varias coincidencias, flechas permitirán recorrerlas en el lado izquierd
 
 Los siguientes estados se aplican a solicitudes de publicación y de corrección:
 
-| Estado | Significado |
-| --- | --- |
-| Pendiente de revisión | El autor envió el contenido y todavía no existe una decisión. |
-| Aprobada | El administrador aceptó la publicación o la corrección. |
-| Rechazada | El administrador no aceptó el envío y registró un motivo obligatorio, visible para el autor. |
-| Cancelada | El autor retiró el envío mientras estaba pendiente, antes de su aprobación. |
+| Estado                | Significado                                                                                  |
+| --------------------- | -------------------------------------------------------------------------------------------- |
+| Pendiente de revisión | El autor envió el contenido y todavía no existe una decisión.                                |
+| Aprobada              | El administrador aceptó la publicación o la corrección.                                      |
+| Rechazada             | El administrador no aceptó el envío y registró un motivo obligatorio, visible para el autor. |
+| Cancelada             | El autor retiró el envío mientras estaba pendiente, antes de su aprobación.                  |
 
 Una solicitud pendiente puede aprobarse, rechazarse o cancelarse. Una solicitud cancelada no se puede aprobar; después de corregir el contenido, el autor realiza un nuevo envío. Deshabilitar al autor conserva el estado Pendiente de revisión, pero bloquea la aprobación hasta reactivar la cuenta, sin crear un estado adicional ni aprobar automáticamente.
 
@@ -269,13 +277,13 @@ No hay una integración externa de recetas aprobada como parte del alcance actua
 
 ## 6. Tecnologías y distribución de responsabilidades
 
-| Parte del sistema                  | Tecnología o herramienta acordada | Función                                                                       |
-| ---------------------------------- | --------------------------------- | ----------------------------------------------------------------------------- |
-| Aplicación móvil                   | React Native, Expo y TypeScript   | Pantallas e interacción con el usuario.                                       |
-| Backend                            | Laravel con PHP                   | API, reglas de negocio, acceso a datos y soporte de gestión de cuentas y revisión web. |
+| Parte del sistema                  | Tecnología o herramienta acordada | Función                                                                                                           |
+| ---------------------------------- | --------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Aplicación móvil                   | React Native, Expo y TypeScript   | Pantallas e interacción con el usuario.                                                                           |
+| Backend                            | Laravel con PHP                   | API, reglas de negocio, acceso a datos y soporte de gestión de cuentas y revisión web.                            |
 | Base de datos                      | MariaDB mediante XAMPP            | Almacenar cuentas, recetas, ingredientes, categorías, favoritos, valoraciones y solicitudes de revisión enviadas. |
-| Administración de la base de datos | phpMyAdmin                        | Consultar y administrar la base de datos durante el desarrollo.               |
-| Control de versiones               | Git y GitHub                      | Registrar cambios y colaborar entre integrantes.                              |
+| Administración de la base de datos | phpMyAdmin                        | Consultar y administrar la base de datos durante el desarrollo.                                                   |
+| Control de versiones               | Git y GitHub                      | Registrar cambios y colaborar entre integrantes.                                                                  |
 
 **XAMPP es el paquete de herramientas; MariaDB es el motor de base de datos. SQL es el lenguaje de consultas.** La decisión más reciente fue mantener MariaDB con XAMPP en lugar de utilizar SQLite como base principal del proyecto.
 
