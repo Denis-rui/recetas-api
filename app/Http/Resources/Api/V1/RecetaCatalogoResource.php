@@ -35,6 +35,18 @@ class RecetaCatalogoResource extends JsonResource
                 ])->values()->all()
                 : [],
             'cantidad_ingredientes' => (int) ($this->cantidad_ingredientes ?? $this->ingredientes_count ?? 0),
+            $this->mergeWhen($this->relationLoaded('ingredientesDisponibles'), fn () => [
+                'ingredientes_disponibles' => $this->ingredientesDisponibles->map(fn ($ingrediente) => [
+                    'ingrediente_id' => (int) $ingrediente->id,
+                    'nombre' => (string) $ingrediente->nombre,
+                ])->all(),
+                'ingredientes_faltantes' => $this->ingredientesFaltantes->map(fn ($ingrediente) => [
+                    'ingrediente_id' => (int) $ingrediente->id,
+                    'nombre' => (string) $ingrediente->nombre,
+                ])->all(),
+                'cantidad_coincidencias' => (int) $this->cantidad_coincidencias,
+                'cantidad_faltantes' => (int) $this->cantidad_faltantes,
+            ]),
         ];
     }
 }
