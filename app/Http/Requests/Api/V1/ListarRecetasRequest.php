@@ -2,7 +2,10 @@
 
 namespace App\Http\Requests\Api\V1;
 
+use App\Models\Ingrediente;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class ListarRecetasRequest extends FormRequest
 {
@@ -22,7 +25,7 @@ class ListarRecetasRequest extends FormRequest
     }
 
     /**
-     * @return array<string, array<int, string>>
+     * @return array<string, array<int, string|Closure>>
      */
     public function rules(): array
     {
@@ -31,6 +34,38 @@ class ListarRecetasRequest extends FormRequest
             'per_page' => ['sometimes', 'integer', 'between:1,50'],
             'buscar' => ['sometimes', 'nullable', 'string', 'max:100'],
             'categoria_id' => ['sometimes', 'integer', 'min:1', 'exists:categorias,id'],
+            'ingredientes' => ['sometimes', 'bail', 'array', 'list', 'max:50'],
+            'ingredientes.*' => [
+                'bail',
+                'required',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_int($value) && ! is_string($value)) {
+                        $fail('Cada ingrediente debe ser un identificador entero.');
+                    }
+                },
+                'integer',
+                'min:1',
+                'distinct',
+            ],
+        ];
+    }
+
+    /**
+     * @return array<int, Closure>
+     */
+    public function after(): array
+    {
+        return [
+            function (Validator $validator): void {
+                if ($validator->errors()->isNotEmpty()) {
+                    return;
+                }
+
+                $ingredientes = $this->input('ingredientes', []);
+                if ($ingredientes !== [] && Ingrediente::query()->whereIn('id', $ingredientes)->count() !== count($ingredientes)) {
+                    $validator->errors()->add('ingredientes', 'Uno o más ingredientes seleccionados ya no existen.');
+                }
+            },
         ];
     }
 
@@ -49,6 +84,13 @@ class ListarRecetasRequest extends FormRequest
             'categoria_id.integer' => 'La categoría debe ser un número entero.',
             'categoria_id.min' => 'La categoría no es válida.',
             'categoria_id.exists' => 'La categoría seleccionada no es válida.',
+            'ingredientes.array' => 'Los ingredientes deben enviarse como una lista de identificadores.',
+            'ingredientes.list' => 'Los ingredientes deben formar una lista con índices consecutivos desde cero.',
+            'ingredientes.max' => 'Puedes seleccionar como máximo 50 ingredientes.',
+            'ingredientes.*.required' => 'Cada ingrediente debe tener un identificador.',
+            'ingredientes.*.integer' => 'Cada ingrediente debe ser un identificador entero.',
+            'ingredientes.*.min' => 'Cada identificador de ingrediente debe ser mayor que cero.',
+            'ingredientes.*.distinct' => 'No repitas ingredientes en la selección.',
         ];
     }
 }

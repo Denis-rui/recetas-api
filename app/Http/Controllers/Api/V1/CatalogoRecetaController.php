@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\ListarRecetasRequest;
 use App\Http\Resources\Api\V1\RecetaCatalogoResource;
 use App\Http\Resources\Api\V1\RecetaDetalleResource;
+use App\Models\Ingrediente;
 use App\Models\Receta;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -42,13 +43,33 @@ class CatalogoRecetaController extends Controller
             $query->whereHas('categorias', fn ($subQuery) => $subQuery->where('categorias.id', $categoriaId));
         }
 
-        $perPage = (int) $request->input('per_page', 15);
+        $ingredientesSeleccionados = array_map('intval', $request->validated('ingredientes', []));
+        if ($ingredientesSeleccionados !== []) {
+            $query->whereHas('ingredientes', fn ($subQuery) => $subQuery->whereIn('ingredientes.id', $ingredientesSeleccionados))
+                ->withCount([
+                    'ingredientes as cantidad_coincidencias' => fn ($subQuery) => $subQuery->whereIn('ingredientes.id', $ingredientesSeleccionados),
+                    'ingredientes as cantidad_faltantes' => fn ($subQuery) => $subQuery->whereNotIn('ingredientes.id', $ingredientesSeleccionados),
+                ])
+                ->orderBy('cantidad_faltantes');
+        }
+
+        $perPage = (int) $request->validated('per_page', 15);
 
         $recetas = $query
             ->orderByDesc('publicada_en')
             ->orderByDesc('id')
             ->paginate($perPage)
             ->withQueryString();
+
+        if ($ingredientesSeleccionados !== []) {
+            foreach ($recetas as $receta) {
+                [$disponibles, $faltantes] = $receta->ingredientes->partition(
+                    fn (Ingrediente $ingrediente): bool => in_array((int) $ingrediente->id, $ingredientesSeleccionados, true),
+                );
+                $receta->setRelation('ingredientesDisponibles', $disponibles->values());
+                $receta->setRelation('ingredientesFaltantes', $faltantes->values());
+            }
+        }
 
         return RecetaCatalogoResource::collection($recetas);
     }
