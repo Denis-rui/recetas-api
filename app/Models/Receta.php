@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -19,19 +20,20 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 ])]
 class Receta extends Model
 {
+    use HasFactory;
     use SoftDeletes;
 
     protected $table = 'recetas';
 
-protected function casts(): array
-{
-    return [
-        'porciones' => 'integer',
-        'tiempo_preparacion' => 'integer',
-        'publicada_en' => 'datetime',
-        'version' => 'integer',
-    ];
-}
+    protected function casts(): array
+    {
+        return [
+            'porciones' => 'integer',
+            'tiempo_preparacion' => 'integer',
+            'publicada_en' => 'datetime',
+            'version' => 'integer',
+        ];
+    }
 
     public function creador(): BelongsTo
     {
@@ -81,18 +83,19 @@ protected function casts(): array
             'usuario_id',
         )->withTimestamps();
     }
+
     public function solicitudesRevision(): HasMany
-{
-    return $this->hasMany(SolicitudRevision::class, 'receta_id');
-}
+    {
+        return $this->hasMany(SolicitudRevision::class, 'receta_id');
+    }
 
-public function valoraciones(): HasMany
-{
-    return $this->hasMany(Valoracion::class, 'receta_id');
-}
+    public function valoraciones(): HasMany
+    {
+        return $this->hasMany(Valoracion::class, 'receta_id');
+    }
 
-public function eliminadoPor(): BelongsTo
-{
-    return $this->belongsTo(User::class, 'eliminado_por');
-}
+    public function eliminadoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'eliminado_por');
+    }
 }

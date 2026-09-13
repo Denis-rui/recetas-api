@@ -77,6 +77,11 @@
                 Gestión de usuarios
             </a>
 
+            <a href="{{ route('revision-recetas.index') }}" class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition {{ request()->routeIs('revision-recetas.*') ? 'bg-amber-50 text-amber-800 font-semibold shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' }}">
+                <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4M9 5H6a2 2 0 00-2 2v13h16V7a2 2 0 00-2-2h-3M9 3h6v4H9z" /></svg>
+                Revisión de recetas
+            </a>
+
             <a href="{{ route('perfil.edit') }}" 
                class="flex items-center px-3.5 py-2.5 rounded-xl text-sm font-medium transition {{ request()->routeIs('perfil.*') ? 'bg-amber-50 text-amber-800 font-semibold shadow-xs' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100' }}">
                 <svg class="w-5 h-5 mr-3 {{ request()->routeIs('perfil.*') ? 'text-amber-600' : 'text-slate-400' }}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -150,7 +155,7 @@
         <!-- Pie de Página -->
         <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 shrink-0">
             <div class="max-w-6xl mx-auto px-4">
-                &copy; {{ date('Y') }} ¿Qué Cocinamos? &bull; Módulo Web Administrativo de Usuarios
+                &copy; {{ date('Y') }} ¿Qué Cocinamos? &bull; Panel Administrativo
             </div>
         </footer>
     </div>

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\PerfilController;
+use App\Http\Controllers\Web\RevisionRecetaController;
 use App\Http\Controllers\Web\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
@@ -32,6 +33,12 @@ Route::middleware(['auth', 'admin.activo'])->group(function () {
     Route::patch('/usuarios/{usuario}/reactivar', [UsuarioController::class, 'reactivar'])->name('usuarios.reactivar');
 
     // Mi perfil
+    Route::get('/revision-recetas', [RevisionRecetaController::class, 'index'])->name('revision-recetas.index');
+    Route::get('/revision-recetas/{solicitud}', [RevisionRecetaController::class, 'show'])->name('revision-recetas.show');
+    Route::get('/revision-recetas/{solicitud}/imagen/{version}', [RevisionRecetaController::class, 'imagen'])->whereIn('version', ['publicada', 'propuesta'])->name('revision-recetas.imagen');
+    Route::post('/revision-recetas/{solicitud}/aprobar', [RevisionRecetaController::class, 'aprobar'])->name('revision-recetas.aprobar');
+    Route::post('/revision-recetas/{solicitud}/rechazar', [RevisionRecetaController::class, 'rechazar'])->name('revision-recetas.rechazar');
+
     Route::get('/perfil', [PerfilController::class, 'edit'])->name('perfil.edit');
     Route::put('/perfil', [PerfilController::class, 'update'])->name('perfil.update');
     Route::put('/perfil/password', [PerfilController::class, 'cambiarPassword'])->name('perfil.password');
