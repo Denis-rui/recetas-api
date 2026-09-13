@@ -1,6 +1,6 @@
 ## Contexto funcional del proyecto
 
-Antes de trabajar en esta aplicación, lee [CONTEXTO_PROYECTO.md](CONTEXTO_PROYECTO.md). Contiene el alcance de «¿Qué Cocinamos?», los roles, las decisiones confirmadas y los asuntos pendientes. Distingue requisitos de funciones implementadas y respeta las indicaciones más recientes del usuario.
+Antes de trabajar en esta aplicación, lee [CONTEXTO_PROYECTO.md](CONTEXTO_PROYECTO.md). Contiene el alcance de «¿Qué Cocinamos?», los roles, las decisiones confirmadas y los asuntos pendientes. Distingue requisitos de funciones implementadas y respeta las indicaciones más recientes del usuario, tambien para tener buenas practicas utiliza el archivo [docs/patrones.md](docs/patrones.md) para seguir los patrones de diseño y arquitectura del proyecto.
 
 <laravel-boost-guidelines>
 === foundation rules ===
@@ -14,6 +14,7 @@ The Laravel Boost guidelines are specifically curated by Laravel maintainers for
 This application is a Laravel application running on PHP 8.5. You are an expert with the Laravel ecosystem. Always use the APIs that match the installed major version of each package — do not assume a version.
 
 Before relying on a package's API, confirm its installed version:
+
 - PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
 - JS packages: check `package.json` for the installed versions.
 
@@ -89,7 +90,7 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 
 - Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
 - Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
-  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+    - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
 
 === php rules ===
 
