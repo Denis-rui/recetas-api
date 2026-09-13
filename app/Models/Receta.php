@@ -15,6 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'imagen',
     'porciones',
     'tiempo_preparacion',
+    'tips',
 ])]
 class Receta extends Model
 {
@@ -22,13 +23,15 @@ class Receta extends Model
 
     protected $table = 'recetas';
 
-    protected function casts(): array
-    {
-        return [
-            'porciones' => 'integer',
-            'tiempo_preparacion' => 'integer',
-        ];
-    }
+protected function casts(): array
+{
+    return [
+        'porciones' => 'integer',
+        'tiempo_preparacion' => 'integer',
+        'publicada_en' => 'datetime',
+        'version' => 'integer',
+    ];
+}
 
     public function creador(): BelongsTo
     {
@@ -78,4 +81,18 @@ class Receta extends Model
             'usuario_id',
         )->withTimestamps();
     }
+    public function solicitudesRevision(): HasMany
+{
+    return $this->hasMany(SolicitudRevision::class, 'receta_id');
+}
+
+public function valoraciones(): HasMany
+{
+    return $this->hasMany(Valoracion::class, 'receta_id');
+}
+
+public function eliminadoPor(): BelongsTo
+{
+    return $this->belongsTo(User::class, 'eliminado_por');
+}
 }
