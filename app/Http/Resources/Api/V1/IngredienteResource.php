@@ -22,4 +22,3 @@ class IngredienteResource extends JsonResource
         ];
     }
 }
-

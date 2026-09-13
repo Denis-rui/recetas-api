@@ -48,12 +48,32 @@ class ActualizarPerfil
 
         try {
             DB::transaction(function () use ($usuario, $datos, $nuevaFoto) {
-                $usuario->name = $datos['name'];
-                $usuario->email = $datos['email'];
+                $cambioEmail = false;
+                $emailAnterior = $usuario->email;
+
+                if (array_key_exists('name', $datos)) {
+                    $usuario->name = $datos['name'];
+                }
+
+                if (array_key_exists('email', $datos) && $datos['email'] !== $emailAnterior) {
+                    $usuario->email = $datos['email'];
+                    $usuario->email_verified_at = null;
+                    $cambioEmail = true;
+                }
+
                 if ($nuevaFoto !== null) {
                     $usuario->foto_perfil = $nuevaFoto;
                 }
+
                 $usuario->save();
+
+                if ($cambioEmail) {
+                    DB::table('recuperaciones_password')
+                        ->where('user_id', $usuario->id)
+                        ->orWhere('email', $emailAnterior)
+                        ->whereNull('invalidado_en')
+                        ->update(['invalidado_en' => now()]);
+                }
             });
         } catch (\Throwable $e) {
             if ($nuevaFoto !== null && Storage::disk('public')->exists($nuevaFoto)) {

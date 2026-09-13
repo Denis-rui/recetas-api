@@ -28,6 +28,11 @@ class DeshabilitarCuenta
                 $usuario->tokens()->delete();
             }
 
+            DB::table('recuperaciones_password')
+                ->where('user_id', $usuario->id)
+                ->whereNull('invalidado_en')
+                ->update(['invalidado_en' => now()]);
+
             return $usuario;
         });
     }

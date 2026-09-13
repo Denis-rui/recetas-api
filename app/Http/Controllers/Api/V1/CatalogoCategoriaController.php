@@ -19,4 +19,3 @@ class CatalogoCategoriaController extends Controller
         return CategoriaResource::collection($categorias);
     }
 }
-

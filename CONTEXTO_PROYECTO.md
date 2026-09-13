@@ -49,8 +49,17 @@ La consulta del catálogo no debe exigir registro. Las operaciones administrativ
 
 - Al abrir la aplicación, el usuario podrá iniciar sesión o continuar sin cuenta.
 - Desde la pantalla de inicio de sesión podrá acceder al registro y a la recuperación de acceso.
-- El registro utilizará correo electrónico y contraseña.
-- La forma técnica de autenticar las solicitudes y recuperar contraseñas todavía debe definirse.
+- El registro utilizará correo electrónico, nombre completo y contraseña (con política vigente de mínimo 12 caracteres y confirmación). El registro asigna rol usuario y estado activo desde el servidor y no inicia sesión automáticamente.
+- La autenticación de la aplicación móvil utiliza Laravel Sanctum mediante tokens Bearer con expiración configurable (30 días por defecto).
+- **Decisión confirmada sobre recuperación de contraseña por código:**
+    - El usuario introduce su correo registrado.
+    - Recibe un código numérico aleatorio de 6 dígitos en ese correo (vigencia de 10 minutos, máximo de 5 intentos fallidos, espera mínima de 60 segundos entre reenvíos).
+    - Introduce el código en una pantalla de la aplicación móvil (recuperación por código en la app, no mediante enlace a formulario web).
+    - Al verificarse con éxito, se consume el código y se emite una autorización temporal de recuperación (`token_recuperacion`) de un solo uso y vigencia limitada (15 minutos).
+    - El usuario establece y confirma su nueva contraseña utilizando esa autorización.
+    - Al restablecerse la contraseña, se revoca todo acceso previo (tokens Sanctum, sesiones web y «Recordarme») y el usuario debe iniciar sesión con su nueva contraseña.
+    - Si el correo no está registrado o la cuenta está deshabilitada, no se genera ni envía ningún código y se devuelve una respuesta genérica idéntica para prevenir la enumeración de cuentas. La verificación para correos no registrados responde con el mismo error genérico de código inválido o vencido.
+    - _Diferenciación de alcance:_ Esta confirmación corresponde exclusivamente a la recuperación de contraseña. La comprobación de propiedad del correo para el registro o para cambios de correo permanece como una decisión funcional pendiente (no se añaden flujos adicionales de códigos para estos casos).
 
 ### 4.2. Catálogo y categorías
 
@@ -298,7 +307,7 @@ Se mantendrá una base de código adaptable a Android e iOS. Durante el curso se
 - Se conversó sobre Blade y Livewire para el panel web. No quedó confirmada la selección final.
 - Blade se propuso como una base sencilla; Livewire como alternativa para formularios y tablas interactivas usando PHP y Blade.
 - React para una interfaz web y React Native para la aplicación móvil son tecnologías con usos distintos. La opción «React» del instalador de Laravel no crea la aplicación móvil.
-- Sanctum se mencionó como una posibilidad para autenticar la API. No se ha aprobado ni verificado su implementación.
+- Sanctum es la tecnología confirmada e implementada para autenticar las solicitudes de la API móvil mediante tokens Bearer. El panel web conserva su autenticación basada en sesiones y cookies.
 - No están aprobados proveedores externos de inicio de sesión, como Google.
 - No se ha elegido alojamiento para producción.
 
@@ -375,7 +384,7 @@ Estas prácticas se propusieron para el equipo; no se ha comprobado que estén c
 4. Contenido que se descarga al guardar en favoritos y momento de la descarga. Ya se confirmó que una copia descargada puede consultarse sin conexión y que, al confirmar su eliminación con el servidor, se deja de mostrar el contenido y se conserva el aviso en favoritos.
 5. Tratamiento de favoritos locales al iniciar sesión o registrarse y posibles duplicados.
 6. Herramienta de audio y comportamiento sin conexión.
-7. Método de autenticación de la API, recuperación de contraseña y comprobación de cambios de correo.
+7. Método de autenticación de la API y recuperación de contraseña: Ya se confirmó y definió el uso de Laravel Sanctum con tokens Bearer para la API móvil y el flujo de recuperación de contraseña por código de 6 dígitos en tres pasos (solicitar, verificar y restablecer). Permanece pendiente la comprobación de titularidad de correo en el registro y en los cambios de correo (no se aprueban flujos adicionales de códigos sin confirmación).
 8. Mecanismo para preparar la primera cuenta administradora. Los permisos generales y las restricciones sobre la cuenta propia están definidos en la sección 4.8.
 9. Detalles de eliminación: conservación de contenido en el servidor, posible restauración y efectos en solicitudes abiertas, valoraciones y enlaces. Ya se confirmó que el autor puede eliminar sus recetas, que el administrador puede eliminar recetas públicas ajenas con un motivo obligatorio visible para el autor y que los favoritos existentes mostrarán un aviso. Las copias descargadas dejan de mostrarse al confirmar la eliminación con el servidor, según la sección 4.5. Deshabilitar al autor mantiene sus recetas públicas disponibles y sus solicitudes pendientes conservadas, pero bloquea su aprobación hasta reactivar la cuenta, sin publicación automática. La eliminación de una receta requiere una acción independiente. No se permite pasar de pública a privada.
 10. Elección definitiva de Blade o Livewire para el panel web.

@@ -38,4 +38,3 @@ class RecetaCatalogoResource extends JsonResource
         ];
     }
 }
-
