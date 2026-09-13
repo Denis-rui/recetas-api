@@ -4,10 +4,12 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogoCategoriaController;
 use App\Http\Controllers\Api\V1\CatalogoIngredienteController;
 use App\Http\Controllers\Api\V1\CatalogoRecetaController;
+use App\Http\Controllers\Api\V1\FavoritoController;
 use App\Http\Controllers\Api\V1\MisRecetasController;
 use App\Http\Controllers\Api\V1\MisSolicitudesController;
 use App\Http\Controllers\Api\V1\PerfilController;
 use App\Http\Controllers\Api\V1\RecuperacionPasswordController;
+use App\Http\Controllers\Api\V1\ValoracionController;
 use App\Http\Resources\Api\V1\PerfilResource;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -74,6 +76,19 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::get('/{solicitud}', [MisSolicitudesController::class, 'show'])->name('show');
             Route::get('/{solicitud}/imagen', [MisSolicitudesController::class, 'imagen'])->name('imagen');
             Route::post('/{solicitud}/cancelar', [MisSolicitudesController::class, 'cancelar'])->name('cancelar');
+        });
+
+        Route::prefix('favoritos')->name('favoritos.')->group(function () {
+            Route::get('/', [FavoritoController::class, 'index'])->name('index');
+            Route::post('/verificar-disponibilidad', [FavoritoController::class, 'verificarDisponibilidad'])->name('verificar-disponibilidad');
+            Route::post('/{receta}', [FavoritoController::class, 'store'])->name('store');
+            Route::delete('/{receta}', [FavoritoController::class, 'destroy'])->name('destroy');
+            Route::get('/{receta}/estado', [FavoritoController::class, 'estado'])->name('estado');
+        });
+
+        Route::prefix('recetas/{receta}/valoracion')->name('recetas.valoracion.')->group(function () {
+            Route::get('/', [ValoracionController::class, 'show'])->name('show');
+            Route::match(['put', 'post'], '/', [ValoracionController::class, 'store'])->name('store');
         });
     });
 });
