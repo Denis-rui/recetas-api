@@ -12,4 +12,3 @@ return [
     */
     'rate_limit' => (int) env('USUARIOS_LISTADO_RATE_LIMIT', 60),
 ];
-
