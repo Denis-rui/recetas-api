@@ -1,7 +1,9 @@
 <?php
 
 use App\Models\User;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 beforeEach(function () {
     $this->admin = User::create([
@@ -324,4 +326,151 @@ test('los endpoints responden con codigos HTTP semanticos adecuados (201 Created
         'email' => 'api.creado@quecocinamos.com',
     ]);
     $respUpdateJson->assertStatus(200); // Response::HTTP_OK
+});
+
+test('reemplazo exitoso de fotografia al actualizar cuenta de otro usuario elimina la anterior', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('perfiles/foto_antigua_otro.jpg', 'contenido-viejo');
+
+    $otro = User::create([
+        'name' => 'Usuario Con Foto',
+        'email' => 'con.foto@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+        'foto_perfil' => 'perfiles/foto_antigua_otro.jpg',
+    ]);
+
+    $nuevaFoto = UploadedFile::fake()->create('nueva_foto_otro.jpg', 100, 'image/jpeg');
+
+    $response = $this->actingAs($this->admin)->put(route('usuarios.update', $otro), [
+        'name' => 'Usuario Con Foto Editado',
+        'email' => 'con.foto@quecocinamos.com',
+        'foto_perfil' => $nuevaFoto,
+    ]);
+
+    $response->assertRedirect(route('usuarios.index'));
+    $response->assertSessionHas('exito');
+
+    $otro->refresh();
+    expect($otro->foto_perfil)->not->toBe('perfiles/foto_antigua_otro.jpg')
+        ->and(Storage::disk('public')->exists($otro->foto_perfil))->toBeTrue()
+        ->and(Storage::disk('public')->exists('perfiles/foto_antigua_otro.jpg'))->toBeFalse();
+});
+
+test('fallo de almacenamiento al actualizar cuenta conserva la fotografia anterior y su referencia', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('perfiles/foto_antigua_otro.jpg', 'contenido-viejo');
+
+    $otro = User::create([
+        'name' => 'Usuario Con Foto',
+        'email' => 'con.foto.fallo@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+        'foto_perfil' => 'perfiles/foto_antigua_otro.jpg',
+    ]);
+
+    $mockDisk = Mockery::mock(Storage::disk('public'))->makePartial();
+    $mockDisk->shouldReceive('putFileAs')->andReturn(false);
+    Storage::set('public', $mockDisk);
+
+    $nuevaFoto = UploadedFile::fake()->create('nueva_foto_otro.jpg', 100, 'image/jpeg');
+
+    $response = $this->actingAs($this->admin)->put(route('usuarios.update', $otro), [
+        'name' => 'Usuario Con Foto Editado',
+        'email' => 'con.foto.fallo@quecocinamos.com',
+        'foto_perfil' => $nuevaFoto,
+    ]);
+
+    // La foto original debe conservarse en disco y en la base de datos
+    expect(Storage::disk('public')->exists('perfiles/foto_antigua_otro.jpg'))->toBeTrue();
+
+    $otro->refresh();
+    expect($otro->foto_perfil)->toBe('perfiles/foto_antigua_otro.jpg');
+
+    $response->assertSessionHasErrors('foto_perfil');
+});
+
+test('fallo de persistencia al actualizar cuenta conserva la fotografia anterior y limpia el nuevo archivo', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('perfiles/foto_antigua_otro.jpg', 'contenido-viejo');
+
+    $otro = User::create([
+        'name' => 'Usuario Con Foto',
+        'email' => 'con.foto.dbfallo@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+        'foto_perfil' => 'perfiles/foto_antigua_otro.jpg',
+    ]);
+
+    User::saving(function ($user) use ($otro) {
+        if ($user->id === $otro->id && $user->isDirty('foto_perfil') && $user->foto_perfil !== 'perfiles/foto_antigua_otro.jpg') {
+            throw new RuntimeException('Fallo simulado de base de datos durante la persistencia de cuenta.');
+        }
+    });
+
+    $nuevaFoto = UploadedFile::fake()->create('nueva_foto_otro.jpg', 100, 'image/jpeg');
+
+    try {
+        $response = $this->actingAs($this->admin)->put(route('usuarios.update', $otro), [
+            'name' => 'Usuario Con Foto Editado',
+            'email' => 'con.foto.dbfallo@quecocinamos.com',
+            'foto_perfil' => $nuevaFoto,
+        ]);
+
+        $response->assertSessionHasErrors('foto_perfil');
+    } catch (Throwable $e) {
+        // En caso de que el código no capture la excepción antes de la corrección
+    } finally {
+        User::flushEventListeners();
+    }
+
+    // La foto original debe conservarse intacta en disco y en base de datos
+    expect(Storage::disk('public')->exists('perfiles/foto_antigua_otro.jpg'))->toBeTrue();
+
+    $otro->refresh();
+    expect($otro->foto_perfil)->toBe('perfiles/foto_antigua_otro.jpg');
+
+    // No deben quedar archivos nuevos huérfanos en almacenamiento
+    $archivos = Storage::disk('public')->files('perfiles');
+    expect($archivos)->toBe(['perfiles/foto_antigua_otro.jpg']);
+});
+
+test('si falla unicamente la eliminacion de la foto anterior tras guardar la nueva al actualizar cuenta se conserva el estado valido y se registra advertencia', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put('perfiles/foto_antigua_otro.jpg', 'contenido-viejo');
+
+    $otro = User::create([
+        'name' => 'Usuario Con Foto',
+        'email' => 'con.foto.cleanup@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'usuario',
+        'activo' => true,
+        'foto_perfil' => 'perfiles/foto_antigua_otro.jpg',
+    ]);
+
+    Log::shouldReceive('warning')
+        ->once()
+        ->with(Mockery::pattern('/No se pudo eliminar la fotografía anterior durante la limpieza/'));
+
+    $mockDisk = Mockery::mock(Storage::disk('public'))->makePartial();
+    $mockDisk->shouldReceive('delete')->with('perfiles/foto_antigua_otro.jpg')->andReturn(false);
+    Storage::set('public', $mockDisk);
+
+    $nuevaFoto = UploadedFile::fake()->create('nueva_foto_otro.jpg', 100, 'image/jpeg');
+
+    $response = $this->actingAs($this->admin)->put(route('usuarios.update', $otro), [
+        'name' => 'Usuario Con Foto Editado',
+        'email' => 'con.foto.cleanup@quecocinamos.com',
+        'foto_perfil' => $nuevaFoto,
+    ]);
+
+    $response->assertRedirect(route('usuarios.index'));
+    $response->assertSessionHas('exito');
+
+    $otro->refresh();
+    expect($otro->foto_perfil)->not->toBe('perfiles/foto_antigua_otro.jpg')
+        ->and(Storage::disk('public')->exists($otro->foto_perfil))->toBeTrue();
 });

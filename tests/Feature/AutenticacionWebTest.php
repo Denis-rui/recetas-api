@@ -98,3 +98,56 @@ test('un administrador puede cerrar sesion correctamente', function () {
     $response->assertRedirect(route('login'));
     $this->assertGuest();
 });
+
+test('deshabilitar una cuenta invalida el acceso persistente de recordarme y reactivar exige nuevo inicio de sesion', function () {
+    $adminA = User::create([
+        'name' => 'Admin Uno',
+        'email' => 'admin.uno@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'administrador',
+        'activo' => true,
+    ]);
+
+    $adminB = User::create([
+        'name' => 'Admin Dos',
+        'email' => 'admin.dos@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'rol' => 'administrador',
+        'activo' => true,
+    ]);
+
+    // 1. Admin B inicia sesión con «Recordarme»
+    $loginResponse = $this->post(route('login'), [
+        'email' => 'admin.dos@quecocinamos.com',
+        'password' => 'PasswordValida2026*',
+        'remember' => '1',
+    ]);
+
+    $loginResponse->assertRedirect(route('usuarios.index'));
+    $this->assertAuthenticatedAs($adminB);
+
+    $recallerName = Auth::guard('web')->getRecallerName();
+    $recallerCookie = $loginResponse->getCookie($recallerName);
+    expect($recallerCookie)->not->toBeNull();
+
+    // 2. Admin A deshabilita la cuenta de Admin B
+    $this->actingAs($adminA)->patch(route('usuarios.deshabilitar', $adminB));
+    $adminB->refresh();
+    expect($adminB->estaActivo())->toBeFalse();
+
+    // 3. Admin A reactiva la cuenta de Admin B
+    $this->actingAs($adminA)->patch(route('usuarios.reactivar', $adminB));
+    $adminB->refresh();
+    expect($adminB->estaActivo())->toBeTrue();
+
+    // 4. Se intenta acceder usando la cookie persistente antigua de Admin B en una nueva petición no autenticada
+    // Vaciamos la sesión y reseteamos el guard para simular que no hay sesión activa pero sí la cookie guardada en el navegador
+    $this->flushSession();
+    Auth::guard('web')->forgetUser();
+
+    $responseAccesoAntiguo = $this->withCookie($recallerCookie->getName(), $recallerCookie->getValue())
+        ->get(route('usuarios.index'));
+
+    $responseAccesoAntiguo->assertRedirect(route('login'));
+    $this->assertGuest();
+});
