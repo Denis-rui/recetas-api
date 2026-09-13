@@ -63,3 +63,4 @@ class RecuperacionPasswordController extends Controller
         ], Response::HTTP_OK);
     }
 }
+

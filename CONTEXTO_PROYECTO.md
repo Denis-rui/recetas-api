@@ -52,14 +52,14 @@ La consulta del catálogo no debe exigir registro. Las operaciones administrativ
 - El registro utilizará correo electrónico, nombre completo y contraseña (con política vigente de mínimo 12 caracteres y confirmación). El registro asigna rol usuario y estado activo desde el servidor y no inicia sesión automáticamente.
 - La autenticación de la aplicación móvil utiliza Laravel Sanctum mediante tokens Bearer con expiración configurable (30 días por defecto).
 - **Decisión confirmada sobre recuperación de contraseña por código:**
-  - El usuario introduce su correo registrado.
-  - Recibe un código numérico aleatorio de 6 dígitos en ese correo (vigencia de 10 minutos, máximo de 5 intentos fallidos, espera mínima de 60 segundos entre reenvíos).
-  - Introduce el código en una pantalla de la aplicación móvil (recuperación por código en la app, no mediante enlace a formulario web).
-  - Al verificarse con éxito, se consume el código y se emite una autorización temporal de recuperación (`token_recuperacion`) de un solo uso y vigencia limitada (15 minutos).
-  - El usuario establece y confirma su nueva contraseña utilizando esa autorización.
-  - Al restablecerse la contraseña, se revoca todo acceso previo (tokens Sanctum, sesiones web y «Recordarme») y el usuario debe iniciar sesión con su nueva contraseña.
-  - Si el correo no está registrado o la cuenta está deshabilitada, no se genera ni envía ningún código y se devuelve una respuesta genérica idéntica para prevenir la enumeración de cuentas. La verificación para correos no registrados responde con el mismo error genérico de código inválido o vencido.
-  - *Diferenciación de alcance:* Esta confirmación corresponde exclusivamente a la recuperación de contraseña. La comprobación de propiedad del correo para el registro o para cambios de correo permanece como una decisión funcional pendiente (no se añaden flujos adicionales de códigos para estos casos).
+    - El usuario introduce su correo registrado.
+    - Recibe un código numérico aleatorio de 6 dígitos en ese correo (vigencia de 10 minutos, máximo de 5 intentos fallidos, espera mínima de 60 segundos entre reenvíos).
+    - Introduce el código en una pantalla de la aplicación móvil (recuperación por código en la app, no mediante enlace a formulario web).
+    - Al verificarse con éxito, se consume el código y se emite una autorización temporal de recuperación (`token_recuperacion`) de un solo uso y vigencia limitada (15 minutos).
+    - El usuario establece y confirma su nueva contraseña utilizando esa autorización.
+    - Al restablecerse la contraseña, se revoca todo acceso previo (tokens Sanctum, sesiones web y «Recordarme») y el usuario debe iniciar sesión con su nueva contraseña.
+    - Si el correo no está registrado o la cuenta está deshabilitada, no se genera ni envía ningún código y se devuelve una respuesta genérica idéntica para prevenir la enumeración de cuentas. La verificación para correos no registrados responde con el mismo error genérico de código inválido o vencido.
+    - _Diferenciación de alcance:_ Esta confirmación corresponde exclusivamente a la recuperación de contraseña. La comprobación de propiedad del correo para el registro o para cambios de correo permanece como una decisión funcional pendiente (no se añaden flujos adicionales de códigos para estos casos).
 
 ### 4.2. Catálogo y categorías
 

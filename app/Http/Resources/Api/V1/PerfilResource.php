@@ -29,3 +29,4 @@ class PerfilResource extends JsonResource
         ];
     }
 }
+

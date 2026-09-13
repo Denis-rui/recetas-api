@@ -18,7 +18,7 @@ function asegurarBaseMariaDbAislada(): bool
         $pdo->exec('CREATE DATABASE IF NOT EXISTS recetas_revision_test_concurrencia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
 
         return true;
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         return false;
     }
 }
@@ -28,7 +28,7 @@ function limpiarBaseMariaDbAislada(): void
     try {
         $pdo = new PDO('mysql:host=127.0.0.1;port=3306', 'root', '');
         $pdo->exec('DROP DATABASE IF EXISTS recetas_revision_test_concurrencia');
-    } catch (Throwable $e) {
+    } catch (\Throwable $e) {
         // Ignorar si no se pudo eliminar
     }
 }
@@ -190,7 +190,7 @@ test('en MariaDB el bloqueo pesimista lockForUpdate serializa transacciones real
     try {
         $stmt2 = $pdo2->prepare('SELECT * FROM recuperaciones_password WHERE id = :id FOR UPDATE');
         $stmt2->execute(['id' => $recuperacion->id]);
-    } catch (PDOException $e) {
+    } catch (\PDOException $e) {
         // Código SQLSTATE 1205: Lock wait timeout exceeded
         $bloqueoDetectado = true;
     }

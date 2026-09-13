@@ -35,3 +35,4 @@ class VerificarCodigoRecuperacionRequest extends FormRequest
         ];
     }
 }
+

@@ -57,3 +57,4 @@ class RecuperacionPassword extends Model
         return $this->invalidado_en === null && $this->usado_en === null;
     }
 }
+

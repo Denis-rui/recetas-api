@@ -35,3 +35,4 @@ class RestablecerPasswordRequest extends FormRequest
         ];
     }
 }
+

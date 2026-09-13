@@ -36,3 +36,4 @@ class LoginApiRequest extends FormRequest
         ];
     }
 }
+

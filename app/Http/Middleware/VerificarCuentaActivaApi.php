@@ -37,3 +37,4 @@ class VerificarCuentaActivaApi
         return $next($request);
     }
 }
+

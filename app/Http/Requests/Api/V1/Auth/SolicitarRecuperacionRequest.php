@@ -32,3 +32,4 @@ class SolicitarRecuperacionRequest extends FormRequest
         ];
     }
 }
+
