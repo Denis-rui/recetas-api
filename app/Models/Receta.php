@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -33,6 +34,20 @@ class Receta extends Model
             'publicada_en' => 'datetime',
             'version' => 'integer',
         ];
+    }
+
+    /**
+     * @param  Builder<Receta>  $query
+     * @return Builder<Receta>
+     */
+    public function scopePublicada(Builder $query): Builder
+    {
+        return $query->whereNotNull('publicada_en');
+    }
+
+    public function estaPublicada(): bool
+    {
+        return $this->publicada_en !== null && ! $this->trashed();
     }
 
     public function creador(): BelongsTo

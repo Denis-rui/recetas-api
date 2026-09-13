@@ -67,30 +67,31 @@ class User extends Authenticatable
         return $this->hasMany(Receta::class, 'actualizado_por');
     }
 
-public function favoritos(): BelongsToMany
-{
-    return $this->belongsToMany(
-        Receta::class,
-        'favoritos',
-        'usuario_id',
-        'receta_id',
-    )
-        ->withTimestamps()
-        ->withTrashed();
-}
-    public function solicitudesRevision(): HasMany
-{
-    return $this->hasMany(
-        SolicitudRevision::class,
-        'solicitado_por'
-    );
-}
+    public function favoritos(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            Receta::class,
+            'favoritos',
+            'usuario_id',
+            'receta_id',
+        )
+            ->withTimestamps()
+            ->withTrashed();
+    }
 
-public function valoraciones(): HasMany
-{
-    return $this->hasMany(
-        Valoracion::class,
-        'usuario_id'
-    );
-}
+    public function solicitudesRevision(): HasMany
+    {
+        return $this->hasMany(
+            SolicitudRevision::class,
+            'solicitado_por'
+        );
+    }
+
+    public function valoraciones(): HasMany
+    {
+        return $this->hasMany(
+            Valoracion::class,
+            'usuario_id'
+        );
+    }
 }
