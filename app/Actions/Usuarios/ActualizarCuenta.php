@@ -47,12 +47,26 @@ class ActualizarCuenta
 
         try {
             DB::transaction(function () use ($usuario, $datos, $nuevaFoto) {
+                $emailAnterior = $usuario->email;
+                $cambioEmail = ($datos['email'] !== $emailAnterior);
+
                 $usuario->name = $datos['name'];
                 $usuario->email = $datos['email'];
+                if ($cambioEmail) {
+                    $usuario->email_verified_at = null;
+                }
                 if ($nuevaFoto !== null) {
                     $usuario->foto_perfil = $nuevaFoto;
                 }
                 $usuario->save();
+
+                if ($cambioEmail) {
+                    DB::table('recuperaciones_password')
+                        ->where('user_id', $usuario->id)
+                        ->orWhere('email', $emailAnterior)
+                        ->whereNull('invalidado_en')
+                        ->update(['invalidado_en' => now()]);
+                }
             });
         } catch (\Throwable $e) {
             if ($nuevaFoto !== null && Storage::disk('public')->exists($nuevaFoto)) {

@@ -11,13 +11,15 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\HasApiTokens;
 
 #[Fillable(['name', 'email', 'password', 'foto_perfil', 'rol', 'activo'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasApiTokens, HasFactory, Notifiable;
 
     protected $table = 'users';
 
@@ -92,6 +94,21 @@ class User extends Authenticatable
         return $this->hasMany(
             Valoracion::class,
             'usuario_id'
+        );
+    }
+
+    public function recuperacionesPassword(): HasMany
+    {
+        return $this->hasMany(
+            RecuperacionPassword::class,
+            'user_id'
+        );
+    }
+
+    protected function fotoPerfilUrl(): Attribute
+    {
+        return Attribute::make(
+            get: fn () => $this->foto_perfil ? url(Storage::disk('public')->url($this->foto_perfil)) : null,
         );
     }
 }

@@ -42,5 +42,74 @@ class AppServiceProvider extends ServiceProvider
                     ], 429, $headers);
                 });
         });
+
+        RateLimiter::for('api-login', function (Request $request) {
+            $email = strtolower(trim((string) $request->input('email')));
+            $ip = (string) $request->ip();
+
+            return [
+                Limit::perMinute(5)
+                    ->by('login_account:'.$email)
+                    ->response(function (Request $request, array $headers) {
+                        return response()->json([
+                            'mensaje' => 'Demasiados intentos de acceso fallidos. Por favor, espere antes de reintentar.',
+                            'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                        ], 429, $headers);
+                    }),
+                Limit::perMinute(10)
+                    ->by('login_ip:'.$ip)
+                    ->response(function (Request $request, array $headers) {
+                        return response()->json([
+                            'mensaje' => 'Demasiados intentos de acceso desde esta dirección IP. Por favor, espere antes de reintentar.',
+                            'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                        ], 429, $headers);
+                    }),
+            ];
+        });
+
+        RateLimiter::for('api-recuperacion-solicitar', function (Request $request) {
+            $email = strtolower(trim((string) $request->input('email')));
+            $ip = (string) $request->ip();
+
+            return [
+                Limit::perMinutes(1, 1)
+                    ->by('recup_cooldown:'.$email)
+                    ->response(function (Request $request, array $headers) {
+                        return response()->json([
+                            'mensaje' => 'Debe esperar al menos 60 segundos antes de solicitar un nuevo código de recuperación.',
+                            'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                        ], 429, $headers);
+                    }),
+                Limit::perHour(5)
+                    ->by('recup_email:'.$email)
+                    ->response(function (Request $request, array $headers) {
+                        return response()->json([
+                            'mensaje' => 'Ha excedido el límite de solicitudes de recuperación para este correo. Por favor, intente más tarde.',
+                            'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                        ], 429, $headers);
+                    }),
+                Limit::perHour(15)
+                    ->by('recup_ip:'.$ip)
+                    ->response(function (Request $request, array $headers) {
+                        return response()->json([
+                            'mensaje' => 'Ha excedido el límite de solicitudes de recuperación desde esta dirección IP. Por favor, intente más tarde.',
+                            'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                        ], 429, $headers);
+                    }),
+            ];
+        });
+
+        RateLimiter::for('api-recuperacion-verificar', function (Request $request) {
+            $ip = (string) $request->ip();
+
+            return Limit::perMinute(10)
+                ->by('recup_verificar_ip:'.$ip)
+                ->response(function (Request $request, array $headers) {
+                    return response()->json([
+                        'mensaje' => 'Demasiados intentos de verificación. Por favor, espere antes de reintentar.',
+                        'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                    ], 429, $headers);
+                });
+        });
     }
 }

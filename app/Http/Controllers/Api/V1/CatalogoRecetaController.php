@@ -123,4 +123,3 @@ class CatalogoRecetaController extends Controller
         );
     }
 }
-

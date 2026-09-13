@@ -52,4 +52,3 @@ class ListarRecetasRequest extends FormRequest
         ];
     }
 }
-
