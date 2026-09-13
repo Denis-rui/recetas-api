@@ -4,6 +4,8 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CatalogoCategoriaController;
 use App\Http\Controllers\Api\V1\CatalogoIngredienteController;
 use App\Http\Controllers\Api\V1\CatalogoRecetaController;
+use App\Http\Controllers\Api\V1\MisRecetasController;
+use App\Http\Controllers\Api\V1\MisSolicitudesController;
 use App\Http\Controllers\Api\V1\PerfilController;
 use App\Http\Controllers\Api\V1\RecuperacionPasswordController;
 use App\Http\Resources\Api\V1\PerfilResource;
@@ -53,6 +55,25 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
             Route::patch('/', [PerfilController::class, 'update'])->name('update');
             Route::post('/foto', [PerfilController::class, 'actualizarFoto'])->name('foto');
             Route::put('/password', [PerfilController::class, 'cambiarPassword'])->name('password');
+        });
+
+        Route::prefix('mis-recetas')->name('mis-recetas.')->group(function () {
+            Route::get('/', [MisRecetasController::class, 'index'])->name('index');
+            Route::post('/', [MisRecetasController::class, 'store'])->name('store');
+            Route::get('/{receta}', [MisRecetasController::class, 'show'])->name('show');
+            Route::match(['put', 'patch', 'post'], '/{receta}', [MisRecetasController::class, 'update'])->name('update');
+            Route::delete('/{receta}', [MisRecetasController::class, 'destroy'])->name('destroy');
+            Route::get('/{receta}/imagen', [MisRecetasController::class, 'imagen'])->name('imagen');
+            Route::post('/{receta}/imagen', [MisRecetasController::class, 'subirImagen'])->name('subir-imagen');
+            Route::post('/{receta}/publicar', [MisRecetasController::class, 'publicar'])->name('publicar');
+            Route::post('/{receta}/corregir', [MisRecetasController::class, 'corregir'])->name('corregir');
+        });
+
+        Route::prefix('mis-solicitudes')->name('mis-solicitudes.')->group(function () {
+            Route::get('/', [MisSolicitudesController::class, 'index'])->name('index');
+            Route::get('/{solicitud}', [MisSolicitudesController::class, 'show'])->name('show');
+            Route::get('/{solicitud}/imagen', [MisSolicitudesController::class, 'imagen'])->name('imagen');
+            Route::post('/{solicitud}/cancelar', [MisSolicitudesController::class, 'cancelar'])->name('cancelar');
         });
     });
 });
