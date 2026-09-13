@@ -20,7 +20,9 @@ Route::middleware(['auth', 'admin.activo'])->group(function () {
     });
 
     // Gestión de cuentas de usuario
-    Route::get('/usuarios', [UsuarioController::class, 'index'])->name('usuarios.index');
+    Route::get('/usuarios', [UsuarioController::class, 'index'])
+        ->middleware('throttle:listado-usuarios')
+        ->name('usuarios.index');
     Route::get('/usuarios/crear', [UsuarioController::class, 'create'])->name('usuarios.create');
     Route::post('/usuarios', [UsuarioController::class, 'store'])->name('usuarios.store');
     Route::get('/usuarios/{usuario}/editar', [UsuarioController::class, 'edit'])->name('usuarios.edit');

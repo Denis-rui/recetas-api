@@ -4,9 +4,15 @@ namespace App\Actions\Usuarios;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class ConsultarCuentasDataTable
 {
+    /**
+     * Carácter utilizado explícitamente para la cláusula SQL ESCAPE en búsquedas LIKE.
+     */
+    protected const CARACTER_ESCAPE = '!';
+
     /**
      * Lista blanca de columnas permitidas para ordenamiento (previene inyecciones y errores SQL).
      *
@@ -21,7 +27,21 @@ class ConsultarCuentasDataTable
     ];
 
     /**
-     * Procesa la consulta server-side para DataTables aplicando filtros seguros y debounce/abort.
+     * Columnas estrictamente necesarias para el renderizado del listado de usuarios.
+     *
+     * @var array<int, string>
+     */
+    protected array $columnasSeleccionadas = [
+        'id',
+        'name',
+        'email',
+        'rol',
+        'activo',
+        'foto_perfil',
+    ];
+
+    /**
+     * Procesa la consulta server-side para DataTables aplicando filtros seguros y optimizaciones.
      *
      * @return array<string, mixed>
      */
@@ -40,36 +60,56 @@ class ConsultarCuentasDataTable
         // 3. Conteo total sin filtros
         $recordsTotal = User::count();
 
-        // 4. Construcción de consulta con filtros
+        // 4. Construcción de consulta con detección de filtros efectivamente aplicados
         $query = User::query();
+        $hayFiltrosEfectivos = false;
 
-        // Filtro de búsqueda textual acotada (nombre o correo)
+        // Filtro de búsqueda textual acotada (nombre o correo) con validación de umbral mínimo
         $busqueda = trim((string) $request->input('search.value', ''));
-        if ($busqueda !== '') {
-            // Limitar longitud para evitar abusos
-            $busquedaSanitizada = mb_substr($busqueda, 0, 100);
-            $query->where(function ($sub) use ($busquedaSanitizada) {
-                $sub->where('name', 'like', "%{$busquedaSanitizada}%")
-                    ->orWhere('email', 'like', "%{$busquedaSanitizada}%");
+        $longitudBusqueda = mb_strlen($busqueda, 'UTF-8');
+
+        if ($longitudBusqueda === 1) {
+            throw ValidationException::withMessages([
+                'search' => 'Escribe al menos 2 caracteres para buscar.',
+            ]);
+        }
+
+        if ($longitudBusqueda > 100) {
+            throw ValidationException::withMessages([
+                'search' => 'El término de búsqueda no puede superar los 100 caracteres.',
+            ]);
+        }
+
+        if ($longitudBusqueda >= 2) {
+            $hayFiltrosEfectivos = true;
+            $busquedaEscapada = $this->escaparComodinesLike($busqueda, self::CARACTER_ESCAPE);
+            $terminoLike = "%{$busquedaEscapada}%";
+
+            $query->where(function ($sub) use ($terminoLike) {
+                $sub->whereRaw("name LIKE ? ESCAPE '!'", [$terminoLike])
+                    ->orWhereRaw("email LIKE ? ESCAPE '!'", [$terminoLike]);
             });
         }
 
-        // Filtro adicional por Rol (validado con lista blanca)
+        // Filtro adicional por Rol (validado con lista blanca y detectado como efectivo)
         $filtroRol = $request->input('filtro_rol');
         if (in_array($filtroRol, ['administrador', 'usuario'], true)) {
+            $hayFiltrosEfectivos = true;
             $query->where('rol', $filtroRol);
         }
 
-        // Filtro adicional por Estado (validado con lista blanca)
+        // Filtro adicional por Estado (validado con lista blanca y detectado como efectivo)
         $filtroEstado = $request->input('filtro_estado');
         if ($filtroEstado === 'activo') {
+            $hayFiltrosEfectivos = true;
             $query->where('activo', true);
         } elseif ($filtroEstado === 'deshabilitado') {
+            $hayFiltrosEfectivos = true;
             $query->where('activo', false);
         }
 
-        // 5. Conteo de registros filtrados
-        $recordsFiltered = $query->count();
+        // 5. Conteo de registros filtrados optimizado (evita conteo redundante si no hay filtros aplicados)
+        $recordsFiltered = $hayFiltrosEfectivos ? $query->count() : $recordsTotal;
 
         // 6. Ordenamiento seguro mediante lista blanca
         $columnaOrdenIndice = (int) $request->input('order.0.column', 4);
@@ -79,7 +119,9 @@ class ConsultarCuentasDataTable
             $direccionOrden = 'desc';
         }
 
-        $usuarios = $query->orderBy($columnaOrden, $direccionOrden)
+        // 7. Selección explícita únicamente de las columnas necesarias (excluyendo password, remember_token, etc.)
+        $usuarios = $query->select($this->columnasSeleccionadas)
+            ->orderBy($columnaOrden, $direccionOrden)
             ->skip($start)
             ->take($length)
             ->get();
@@ -186,5 +228,17 @@ class ConsultarCuentasDataTable
             'recordsFiltered' => $recordsFiltered,
             'data' => $data,
         ];
+    }
+
+    /**
+     * Escapa caracteres comodín SQL (%, _) y el carácter de escape para interpretar búsquedas literalmente.
+     */
+    protected function escaparComodinesLike(string $valor, string $caracterEscape = '!'): string
+    {
+        return str_replace(
+            [$caracterEscape, '%', '_'],
+            [$caracterEscape.$caracterEscape, $caracterEscape.'%', $caracterEscape.'_'],
+            $valor
+        );
     }
 }
