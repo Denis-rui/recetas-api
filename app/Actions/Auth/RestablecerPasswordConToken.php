@@ -26,8 +26,32 @@ class RestablecerPasswordConToken
     {
         $tokenHash = hash('sha256', $tokenRecuperacion);
 
-        return DB::transaction(function () use ($tokenHash, $nuevaPassword) {
-            $recuperacion = RecuperacionPassword::where('token_recuperacion_hash', $tokenHash)
+        // Lectura preliminar ligera para localizar al usuario antes de adquirir bloqueos ordenados
+        $previa = DB::table('recuperaciones_password')
+            ->where('token_recuperacion_hash', $tokenHash)
+            ->whereNull('usado_en')
+            ->whereNull('invalidado_en')
+            ->where('token_expira_en', '>', now())
+            ->first(['id', 'user_id']);
+
+        if (! $previa) {
+            throw ValidationException::withMessages([
+                'token_recuperacion' => 'La autorización de recuperación es inválida o ha vencido.',
+            ]);
+        }
+
+        $resultado = DB::transaction(function () use ($previa, $tokenHash, $nuevaPassword) {
+            // 1. Bloqueo pesimista del usuario primero (orden canónico)
+            $usuario = User::where('id', $previa->user_id)->lockForUpdate()->first();
+
+            if (! $usuario || ! $usuario->estaActivo()) {
+                return ['exito' => false];
+            }
+
+            // 2. Bloqueo pesimista de la recuperación segundo
+            $recuperacion = RecuperacionPassword::where('id', $previa->id)
+                ->where('token_recuperacion_hash', $tokenHash)
+                ->where('user_id', $usuario->id)
                 ->whereNull('usado_en')
                 ->whereNull('invalidado_en')
                 ->where('token_expira_en', '>', now())
@@ -35,20 +59,15 @@ class RestablecerPasswordConToken
                 ->first();
 
             if (! $recuperacion) {
-                throw ValidationException::withMessages([
-                    'token_recuperacion' => 'La autorización de recuperación es inválida o ha vencido.',
-                ]);
+                return ['exito' => false];
             }
 
-            $usuario = User::where('id', $recuperacion->user_id)->lockForUpdate()->first();
-
-            if (! $usuario || ! $usuario->estaActivo()) {
+            // Revalidar que la recuperación corresponda al correo actual de la cuenta activa
+            if (strtolower((string) $usuario->email) !== strtolower((string) $recuperacion->email)) {
                 $recuperacion->invalidado_en = now();
                 $recuperacion->save();
 
-                throw ValidationException::withMessages([
-                    'token_recuperacion' => 'La autorización de recuperación es inválida o ha vencido.',
-                ]);
+                return ['exito' => false];
             }
 
             // 1. Actualizar contraseña y limpiar remember_token
@@ -75,8 +94,15 @@ class RestablecerPasswordConToken
             // 5. Invalidar sesiones web activas
             DB::table('sessions')->where('user_id', $usuario->id)->delete();
 
-            return $usuario;
+            return ['exito' => true, 'usuario' => $usuario];
         });
+
+        if (! $resultado['exito']) {
+            throw ValidationException::withMessages([
+                'token_recuperacion' => 'La autorización de recuperación es inválida o ha vencido.',
+            ]);
+        }
+
+        return $resultado['usuario'];
     }
 }
-

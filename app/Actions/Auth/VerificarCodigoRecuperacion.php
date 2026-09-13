@@ -30,10 +30,25 @@ class VerificarCodigoRecuperacion
     {
         $emailNormalizado = strtolower(trim($email));
 
-        DB::beginTransaction();
+        $resultado = DB::transaction(function () use ($emailNormalizado, $codigo) {
+            // 1. Bloqueo pesimista del usuario primero (orden canónico)
+            $usuario = User::where('email', $emailNormalizado)
+                ->lockForUpdate()
+                ->first();
 
-        try {
-            $recuperacion = RecuperacionPassword::where('email', $emailNormalizado)
+            if (! $usuario || ! $usuario->estaActivo() || strtolower((string) $usuario->email) !== $emailNormalizado) {
+                // Si la cuenta ya no existe con ese correo o está inactiva, invalidar recuperaciones pendientes de este correo
+                DB::table('recuperaciones_password')
+                    ->where('email', $emailNormalizado)
+                    ->whereNull('invalidado_en')
+                    ->update(['invalidado_en' => now()]);
+
+                return ['exito' => false, 'tipo' => 'inexistente'];
+            }
+
+            // 2. Bloqueo pesimista de la recuperación segundo
+            $recuperacion = RecuperacionPassword::where('user_id', $usuario->id)
+                ->where('email', $emailNormalizado)
                 ->whereNull('codigo_verificado_en')
                 ->whereNull('usado_en')
                 ->whereNull('invalidado_en')
@@ -43,49 +58,37 @@ class VerificarCodigoRecuperacion
                 ->first();
 
             if (! $recuperacion) {
-                DB::commit();
-                Hash::check('000000', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
-
-                throw ValidationException::withMessages([
-                    'codigo' => 'El código de recuperación es inválido o ha vencido.',
-                ]);
+                return ['exito' => false, 'tipo' => 'inexistente'];
             }
 
-            $usuario = User::where('id', $recuperacion->user_id)->first();
-            if (! $usuario || ! $usuario->estaActivo()) {
+            // Validar que el correo actual del usuario coincida con el de la recuperación
+            if (strtolower((string) $recuperacion->email) !== strtolower((string) $usuario->email)) {
                 $recuperacion->invalidado_en = now();
                 $recuperacion->save();
-                DB::commit();
 
-                throw ValidationException::withMessages([
-                    'codigo' => 'El código de recuperación es inválido o ha vencido.',
-                ]);
+                return ['exito' => false, 'tipo' => 'invalido'];
             }
 
+            // Si ya alcanzó 5 intentos fallidos, asegurar invalidación
             if ($recuperacion->intentos >= 5) {
                 $recuperacion->invalidado_en = now();
                 $recuperacion->save();
-                DB::commit();
 
-                throw ValidationException::withMessages([
-                    'codigo' => 'El código de recuperación es inválido o ha vencido.',
-                ]);
+                return ['exito' => false, 'tipo' => 'bloqueado'];
             }
 
+            // Comprobar coincidencia del código
             if (! Hash::check($codigo, $recuperacion->codigo_hash)) {
                 $recuperacion->intentos += 1;
                 if ($recuperacion->intentos >= 5) {
                     $recuperacion->invalidado_en = now();
                 }
                 $recuperacion->save();
-                DB::commit(); // El intento fallido se persiste antes de lanzar la excepción
 
-                throw ValidationException::withMessages([
-                    'codigo' => 'El código de recuperación es inválido o ha vencido.',
-                ]);
+                return ['exito' => false, 'tipo' => 'codigo_incorrecto'];
             }
 
-            // Código válido: generar token_recuperacion de alta entropía
+            // Código válido: generar token_recuperacion de alta entropía (64 caracteres)
             $tokenPlano = Str::random(64);
             $tokenHash = hash('sha256', $tokenPlano);
 
@@ -94,17 +97,19 @@ class VerificarCodigoRecuperacion
             $recuperacion->token_expira_en = now()->addMinutes(15);
             $recuperacion->save();
 
-            DB::commit();
+            return ['exito' => true, 'token' => $tokenPlano];
+        });
 
-            return $tokenPlano;
-        } catch (ValidationException $e) {
-            throw $e;
-        } catch (\Throwable $e) {
-            if (DB::transactionLevel() > 0) {
-                DB::rollBack();
+        if (! $resultado['exito']) {
+            if (($resultado['tipo'] ?? '') === 'inexistente') {
+                Hash::check('000000', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi');
             }
 
-            throw $e;
+            throw ValidationException::withMessages([
+                'codigo' => 'El código de recuperación es inválido o ha vencido.',
+            ]);
         }
+
+        return $resultado['token'];
     }
 }

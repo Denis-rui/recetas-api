@@ -3,6 +3,7 @@
 use App\Mail\CodigoRecuperacionMail;
 use App\Models\RecuperacionPassword;
 use App\Models\User;
+use Illuminate\Contracts\Mail\Mailer;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
@@ -356,4 +357,138 @@ test('imposibilidad de reutilizar un token_recuperacion ya consumido', function 
 
     $response->assertStatus(422)
         ->assertJsonValidationErrors(['token_recuperacion']);
+});
+
+test('cifrado nativo de Laravel en la cola garantiza que el codigo de 6 digitos no aparezca en texto plano en la tabla jobs', function () {
+    $usuario = User::factory()->create(['email' => 'cifrado@ejemplo.com', 'activo' => true]);
+
+    $recuperacion = RecuperacionPassword::create([
+        'user_id' => $usuario->id,
+        'email' => 'cifrado@ejemplo.com',
+        'codigo_hash' => Hash::make('849201'),
+        'intentos' => 0,
+        'codigo_expira_en' => now()->addMinutes(10),
+    ]);
+
+    // Limpiar tabla jobs y usar el driver database
+    DB::table('jobs')->truncate();
+    Config::set('queue.default', 'database');
+
+    $codigoSecreto = '849201';
+    Mail::to($usuario->email)->queue(new CodigoRecuperacionMail($codigoSecreto, $recuperacion->id, 10));
+
+    $job = DB::table('jobs')->first();
+    expect($job)->not->toBeNull();
+
+    // 1. El código en texto plano '849201' NO debe existir en el payload serializado de la base de datos
+    expect(str_contains((string) $job->payload, $codigoSecreto))->toBeFalse();
+
+    // 2. El comando en data está cifrado nativamente por Laravel (ShouldBeEncrypted)
+    $payload = json_decode($job->payload, true);
+    expect($payload['data']['commandName'])->toContain('SendQueuedMailable')
+        ->and(is_string($payload['data']['command']))->toBeTrue();
+
+    // 3. Al desencriptar el comando mediante el encrypter de la aplicación se recupera el mailable intacto
+    $decryptedCommand = unserialize(app('encrypter')->decrypt($payload['data']['command']));
+    expect($decryptedCommand->mailable->codigo)->toBe($codigoSecreto)
+        ->and($decryptedCommand->mailable->recuperacionId)->toBe($recuperacion->id);
+});
+
+test('descarte seguro de envio en CodigoRecuperacionMail cuando el codigo ya fue verificado, vencio o cambio el correo', function () {
+    $usuario = User::factory()->create(['email' => 'vigencia@ejemplo.com', 'activo' => true]);
+
+    $recuperacion = RecuperacionPassword::create([
+        'user_id' => $usuario->id,
+        'email' => 'vigencia@ejemplo.com',
+        'codigo_hash' => Hash::make('123456'),
+        'intentos' => 0,
+        'codigo_expira_en' => now()->addMinutes(10),
+    ]);
+
+    $mailable = new CodigoRecuperacionMail('123456', $recuperacion->id, 10);
+    $mailerMock = Mockery::mock(Mailer::class);
+    $mailerMock->shouldReceive('send')->never();
+
+    // Caso 1: Código ya verificado (codigo_verificado_en no es null)
+    $recuperacion->update(['codigo_verificado_en' => now()]);
+    expect($mailable->send($mailerMock))->toBeNull();
+
+    // Caso 2: Recuperación invalidada (invalidado_en no es null)
+    $recuperacion->update(['codigo_verificado_en' => null, 'invalidado_en' => now()]);
+    expect($mailable->send($mailerMock))->toBeNull();
+
+    // Caso 3: Código expirado
+    $recuperacion->update(['invalidado_en' => null, 'codigo_expira_en' => now()->subMinutes(1)]);
+    expect($mailable->send($mailerMock))->toBeNull();
+
+    // Caso 4: Cuenta desactivada
+    $recuperacion->update(['codigo_expira_en' => now()->addMinutes(10)]);
+    $usuario->update(['activo' => false]);
+    expect($mailable->send($mailerMock))->toBeNull();
+
+    // Caso 5: Correo del usuario modificado
+    $usuario->update(['activo' => true, 'email' => 'nuevo.correo@ejemplo.com']);
+    expect($mailable->send($mailerMock))->toBeNull();
+});
+
+test('verificar codigo falla e invalida la recuperacion si el usuario cambio su correo despues de solicitar el codigo', function () {
+    $usuario = User::factory()->create(['email' => 'original@ejemplo.com', 'activo' => true]);
+
+    $recuperacion = RecuperacionPassword::create([
+        'user_id' => $usuario->id,
+        'email' => 'original@ejemplo.com',
+        'codigo_hash' => Hash::make('654321'),
+        'intentos' => 0,
+        'codigo_expira_en' => now()->addMinutes(10),
+    ]);
+
+    // El usuario cambia su correo a través de su cuenta
+    $usuario->email = 'modificado@ejemplo.com';
+    $usuario->save();
+
+    // Intentar verificar con el correo original
+    $response = $this->postJson('/api/v1/auth/recuperacion/verificar', [
+        'email' => 'original@ejemplo.com',
+        'codigo' => '654321',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['codigo']);
+
+    $recuperacion->refresh();
+    // La recuperación queda invalidada y no se emitió token
+    expect($recuperacion->invalidado_en)->not->toBeNull()
+        ->and($recuperacion->codigo_verificado_en)->toBeNull();
+});
+
+test('restablecer con token falla e invalida la recuperacion si el usuario cambio su correo despues de verificar', function () {
+    $usuario = User::factory()->create(['email' => 'original@ejemplo.com', 'activo' => true]);
+    $tokenPlano = Str::random(64);
+
+    $recuperacion = RecuperacionPassword::create([
+        'user_id' => $usuario->id,
+        'email' => 'original@ejemplo.com',
+        'codigo_hash' => Hash::make('123456'),
+        'codigo_verificado_en' => now(),
+        'token_recuperacion_hash' => hash('sha256', $tokenPlano),
+        'token_expira_en' => now()->addMinutes(15),
+        'codigo_expira_en' => now()->addMinutes(10),
+    ]);
+
+    // El usuario cambia su correo antes de restablecer la contraseña
+    $usuario->email = 'cambiado@ejemplo.com';
+    $usuario->save();
+
+    $response = $this->postJson('/api/v1/auth/recuperacion/restablecer', [
+        'token_recuperacion' => $tokenPlano,
+        'password' => 'NuevaPasswordValida123*',
+        'password_confirmation' => 'NuevaPasswordValida123*',
+    ]);
+
+    $response->assertStatus(422)
+        ->assertJsonValidationErrors(['token_recuperacion']);
+
+    $recuperacion->refresh();
+    expect($recuperacion->invalidado_en)->not->toBeNull()
+        ->and($recuperacion->usado_en)->toBeNull();
 });

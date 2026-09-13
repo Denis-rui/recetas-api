@@ -29,37 +29,53 @@ class SolicitarRecuperacionPassword
     public function ejecutar(string $email): string
     {
         $emailNormalizado = strtolower(trim($email));
+        $usuarioValido = false;
+        $codigo = null;
+        $emailDestino = null;
+        $recuperacionId = null;
 
-        $usuario = User::where('email', $emailNormalizado)->first();
+        DB::transaction(function () use ($emailNormalizado, &$usuarioValido, &$codigo, &$emailDestino, &$recuperacionId) {
+            // 1. Bloqueo pesimista del usuario (orden canónico: User primero)
+            $usuario = User::where('email', $emailNormalizado)
+                ->lockForUpdate()
+                ->first();
 
-        if ($usuario && $usuario->estaActivo()) {
+            if (! $usuario || ! $usuario->estaActivo() || strtolower((string) $usuario->email) !== $emailNormalizado) {
+                return;
+            }
+
+            $usuarioValido = true;
+            $emailDestino = $usuario->email;
             $codigo = sprintf('%06d', random_int(0, 999999));
 
-            DB::transaction(function () use ($usuario, $emailNormalizado, $codigo) {
-                DB::table('recuperaciones_password')
-                    ->where(function ($query) use ($usuario, $emailNormalizado) {
-                        $query->where('user_id', $usuario->id)
-                            ->orWhere('email', $emailNormalizado);
-                    })
-                    ->whereNull('invalidado_en')
-                    ->update(['invalidado_en' => now()]);
+            // 2. Bloqueo e invalidación de recuperaciones pendientes previas
+            DB::table('recuperaciones_password')
+                ->where(function ($query) use ($usuario, $emailNormalizado) {
+                    $query->where('user_id', $usuario->id)
+                        ->orWhere('email', $emailNormalizado);
+                })
+                ->whereNull('invalidado_en')
+                ->update(['invalidado_en' => now()]);
 
-                RecuperacionPassword::create([
-                    'user_id' => $usuario->id,
-                    'email' => $emailNormalizado,
-                    'codigo_hash' => Hash::make($codigo),
-                    'intentos' => 0,
-                    'codigo_expira_en' => now()->addMinutes(10),
-                    'codigo_verificado_en' => null,
-                    'token_recuperacion_hash' => null,
-                    'token_expira_en' => null,
-                    'usado_en' => null,
-                    'invalidado_en' => null,
-                ]);
-            });
+            $recuperacion = RecuperacionPassword::create([
+                'user_id' => $usuario->id,
+                'email' => $emailNormalizado,
+                'codigo_hash' => Hash::make($codigo),
+                'intentos' => 0,
+                'codigo_expira_en' => now()->addMinutes(10),
+                'codigo_verificado_en' => null,
+                'token_recuperacion_hash' => null,
+                'token_expira_en' => null,
+                'usado_en' => null,
+                'invalidado_en' => null,
+            ]);
 
-            // Envío asíncrono encolado (ShouldQueue) para evitar latencias de red en la respuesta HTTP
-            Mail::to($usuario->email)->queue(new CodigoRecuperacionMail($codigo, 10));
+            $recuperacionId = $recuperacion->id;
+        });
+
+        if ($usuarioValido && $codigo !== null && $emailDestino !== null && $recuperacionId !== null) {
+            // Envío asíncrono encolado y cifrado
+            Mail::to($emailDestino)->queue(new CodigoRecuperacionMail($codigo, $recuperacionId, 10));
         } else {
             // Compensación de tiempo para mitigar timing attacks
             Hash::make('timing_pad_recuperacion_segura');

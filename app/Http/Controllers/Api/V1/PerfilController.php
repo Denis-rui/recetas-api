@@ -75,4 +75,3 @@ class PerfilController extends Controller
         ], Response::HTTP_OK);
     }
 }
-

@@ -17,18 +17,27 @@ class CambiarPassword
     public function ejecutar(User $usuario, string $nuevaPassword): User
     {
         return DB::transaction(function () use ($usuario, $nuevaPassword) {
-            $usuario->password = $nuevaPassword;
-            $usuario->setRememberToken(null);
-            $usuario->save();
-
-            if (method_exists($usuario, 'tokens')) {
-                $usuario->tokens()->delete();
+            // Bloqueo pesimista del usuario primero (orden canónico)
+            $userRecord = User::where('id', $usuario->id)->lockForUpdate()->first();
+            if (! $userRecord) {
+                return $usuario;
             }
 
-            DB::table('sessions')->where('user_id', $usuario->id)->delete();
+            $userRecord->password = $nuevaPassword;
+            $userRecord->setRememberToken(null);
+            $userRecord->save();
+
+            $usuario->password = $userRecord->password;
+            $usuario->setRememberToken(null);
+
+            if (method_exists($userRecord, 'tokens')) {
+                $userRecord->tokens()->delete();
+            }
+
+            DB::table('sessions')->where('user_id', $userRecord->id)->delete();
 
             DB::table('recuperaciones_password')
-                ->where('user_id', $usuario->id)
+                ->where('user_id', $userRecord->id)
                 ->whereNull('invalidado_en')
                 ->update(['invalidado_en' => now()]);
 

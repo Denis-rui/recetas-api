@@ -39,4 +39,3 @@ class CambiarPasswordApiRequest extends FormRequest
         ];
     }
 }
-

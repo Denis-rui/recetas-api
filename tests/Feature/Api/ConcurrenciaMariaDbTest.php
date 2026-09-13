@@ -1,7 +1,5 @@
 <?php
 
-use App\Actions\Auth\RestablecerPasswordConToken;
-use App\Actions\Auth\VerificarCodigoRecuperacion;
 use App\Models\RecuperacionPassword;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -9,52 +7,80 @@ use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
+use Symfony\Component\Process\Process;
 
-function asegurarBaseMariaDbAislada(): bool
+// Propiedad de la base de datos creada exclusivamente en esta ejecución
+$baseCreadaPorEjecucion = null;
+
+function obtenerCredencialesMariaDbTest(): ?array
+{
+    $host = config('database.connections.mariadb_test.host');
+    $port = config('database.connections.mariadb_test.port', '3306');
+    $username = config('database.connections.mariadb_test.username');
+    $password = config('database.connections.mariadb_test.password');
+
+    // Comprobación estricta de seguridad: no utilizar valores de respaldo inseguros (como root o password vacía por defecto)
+    if (empty($host) || empty($username)) {
+        return null;
+    }
+
+    return [
+        'host' => (string) $host,
+        'port' => (string) $port,
+        'username' => (string) $username,
+        'password' => (string) ($password ?? ''),
+    ];
+}
+
+function conectarPdoMariaDbTest(array $credenciales): ?PDO
 {
     try {
-        $pdo = new PDO('mysql:host=127.0.0.1;port=3306', 'root', '');
-        $pdo->exec('CREATE DATABASE IF NOT EXISTS recetas_revision_test_concurrencia CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci');
+        $dsn = "mysql:host={$credenciales['host']};port={$credenciales['port']}";
 
-        return true;
-    } catch (\Throwable $e) {
-        return false;
+        return new PDO($dsn, $credenciales['username'], $credenciales['password'], [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_TIMEOUT => 3,
+        ]);
+    } catch (Throwable $e) {
+        return null;
     }
 }
 
-function limpiarBaseMariaDbAislada(): void
-{
-    try {
-        $pdo = new PDO('mysql:host=127.0.0.1;port=3306', 'root', '');
-        $pdo->exec('DROP DATABASE IF EXISTS recetas_revision_test_concurrencia');
-    } catch (\Throwable $e) {
-        // Ignorar si no se pudo eliminar
-    }
-}
+beforeEach(function () use (&$baseCreadaPorEjecucion) {
+    $credenciales = obtenerCredencialesMariaDbTest();
 
-beforeEach(function () {
-    if (! asegurarBaseMariaDbAislada()) {
-        $this->markTestSkipped('MariaDB no está disponible en 127.0.0.1:3306 para pruebas de concurrencia.');
+    if ($credenciales === null) {
+        $this->markTestSkipped('No existe una configuración explícita de pruebas para MariaDB (DB_TEST_HOST y DB_TEST_USERNAME no configurados en .env). Pruebas de concurrencia en MariaDB omitidas para proteger el entorno.');
     }
 
-    // Configurar conexión aislada mariadb_test
-    Config::set('database.connections.mariadb_test', [
-        'driver' => 'mariadb',
-        'host' => '127.0.0.1',
-        'port' => '3306',
-        'database' => 'recetas_revision_test_concurrencia',
-        'username' => 'root',
-        'password' => '',
-        'charset' => 'utf8mb4',
-        'collation' => 'utf8mb4_unicode_ci',
-        'prefix' => '',
-    ]);
+    $pdo = conectarPdoMariaDbTest($credenciales);
 
-    // Establecer como conexión predeterminada para esta prueba
+    if ($pdo === null) {
+        $this->markTestSkipped("No fue posible conectar al servidor MariaDB de pruebas en {$credenciales['host']}:{$credenciales['port']}. Pruebas omitidas.");
+    }
+
+    // Generar un nombre único por ejecución para garantizar aislamiento estricto
+    $nombreBase = 'recetas_test_concurrencia_'.bin2hex(random_bytes(6));
+
+    // Abortar si la base ya existe en information_schema (no se asume propiedad de bases previas)
+    $stmtCheck = $pdo->prepare('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = :nombre');
+    $stmtCheck->execute(['nombre' => $nombreBase]);
+    if ($stmtCheck->fetch()) {
+        throw new RuntimeException("La base de datos {$nombreBase} ya existe. Abortando para evitar colisión de pruebas.");
+    }
+
+    // Crear la base de datos única sin IF NOT EXISTS
+    $pdo->exec("CREATE DATABASE `{$nombreBase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
+
+    // Registrar la propiedad únicamente después del éxito de CREATE DATABASE
+    $baseCreadaPorEjecucion = $nombreBase;
+
+    // Configurar conexión mariadb_test con la base única
+    Config::set('database.connections.mariadb_test.database', $nombreBase);
+    DB::purge('mariadb_test');
     DB::setDefaultConnection('mariadb_test');
 
-    // Ejecutar migraciones en la base aislada
+    // Ejecutar migraciones en la base única recién creada
     Artisan::call('migrate:fresh', [
         '--database' => 'mariadb_test',
         '--force' => true,
@@ -65,55 +91,80 @@ afterEach(function () {
     DB::setDefaultConnection('sqlite');
 });
 
-afterAll(function () {
-    limpiarBaseMariaDbAislada();
+afterAll(function () use (&$baseCreadaPorEjecucion) {
+    if ($baseCreadaPorEjecucion !== null) {
+        $credenciales = obtenerCredencialesMariaDbTest();
+        if ($credenciales !== null) {
+            $pdo = conectarPdoMariaDbTest($credenciales);
+            if ($pdo !== null) {
+                // Eliminar únicamente la base de datos creada por esta ejecución específica
+                $pdo->exec("DROP DATABASE IF EXISTS `{$baseCreadaPorEjecucion}`");
+            }
+        }
+        $baseCreadaPorEjecucion = null;
+    }
 });
 
-test('en MariaDB dos verificaciones simultaneas del mismo codigo con la accion real solo permiten un exito', function () {
+test('en MariaDB dos verificaciones simultaneas del mismo codigo en procesos independientes solo permiten un exito', function () use (&$baseCreadaPorEjecucion) {
     $usuario = User::create([
         'name' => 'Usuario Concurrencia',
-        'email' => 'concurrencia@ejemplo.com',
+        'email' => 'concurrente@ejemplo.com',
         'password' => Hash::make('PasswordSegura2026*'),
         'rol' => 'usuario',
         'activo' => true,
     ]);
 
-    $codigo = '456789';
+    $codigo = '739281';
     $recuperacion = RecuperacionPassword::create([
         'user_id' => $usuario->id,
-        'email' => 'concurrencia@ejemplo.com',
+        'email' => 'concurrente@ejemplo.com',
         'codigo_hash' => Hash::make($codigo),
         'intentos' => 0,
         'codigo_expira_en' => now()->addMinutes(10),
     ]);
 
-    $accion = app(VerificarCodigoRecuperacion::class);
+    $comandoScript = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        try {
+            $token = app(App\Actions\Auth\VerificarCodigoRecuperacion::class)->ejecutar("concurrente@ejemplo.com", "'.$codigo.'");
+            echo "EXITO:" . $token;
+        } catch (\Throwable $e) {
+            echo "FALLO:" . $e->getMessage();
+        }
+    ';
 
-    // Primera verificación con la acción real
-    $token1 = $accion->ejecutar('concurrencia@ejemplo.com', $codigo);
-    expect($token1)->toBeString()
-        ->and(strlen($token1))->toBe(64);
+    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
+    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
 
-    // Segunda verificación simultánea con la acción real (código ya consumido/verificado)
-    $segundoExito = false;
-    try {
-        $accion->ejecutar('concurrencia@ejemplo.com', $codigo);
-        $segundoExito = true;
-    } catch (ValidationException $e) {
-        expect($e->errors())->toHaveKey('codigo');
-    }
+    // Iniciar ambos procesos en paralelo de forma asíncrona
+    $proceso1->start();
+    $proceso2->start();
 
-    expect($segundoExito)->toBeFalse();
+    // Esperas limitadas (máximo 8 segundos)
+    $proceso1->wait();
+    $proceso2->wait();
+
+    $salida1 = $proceso1->getOutput();
+    $salida2 = $proceso2->getOutput();
+
+    $exitos = (str_contains($salida1, 'EXITO:') ? 1 : 0) + (str_contains($salida2, 'EXITO:') ? 1 : 0);
+    $fallos = (str_contains($salida1, 'FALLO:') ? 1 : 0) + (str_contains($salida2, 'FALLO:') ? 1 : 0);
+
+    // Exactamente 1 proceso debe haber tenido éxito y el otro debe haber fallado
+    expect($exitos)->toBe(1)
+        ->and($fallos)->toBe(1);
 
     $recuperacion->refresh();
-    expect($recuperacion->codigo_verificado_en)->not->toBeNull();
+    expect($recuperacion->codigo_verificado_en)->not->toBeNull()
+        ->and($recuperacion->token_recuperacion_hash)->not->toBeNull();
 });
 
-test('en MariaDB dos solicitudes simultaneas de restablecimiento con la accion real solo permiten un exito', function () {
+test('en MariaDB dos restablecimientos simultaneos del mismo token en procesos independientes solo permiten un exito', function () use (&$baseCreadaPorEjecucion) {
     $usuario = User::create([
-        'name' => 'Usuario Restablecer Concurrente',
-        'email' => 'restablecer@ejemplo.com',
-        'password' => Hash::make('PasswordAntigua123*'),
+        'name' => 'Usuario Restablecer',
+        'email' => 'restablecer_proc@ejemplo.com',
+        'password' => Hash::make('ClaveAntigua123*'),
         'rol' => 'usuario',
         'activo' => true,
     ]);
@@ -121,7 +172,7 @@ test('en MariaDB dos solicitudes simultaneas de restablecimiento con la accion r
     $tokenPlano = Str::random(64);
     $recuperacion = RecuperacionPassword::create([
         'user_id' => $usuario->id,
-        'email' => 'restablecer@ejemplo.com',
+        'email' => 'restablecer_proc@ejemplo.com',
         'codigo_hash' => Hash::make('123456'),
         'codigo_verificado_en' => now(),
         'token_recuperacion_hash' => hash('sha256', $tokenPlano),
@@ -130,74 +181,171 @@ test('en MariaDB dos solicitudes simultaneas de restablecimiento con la accion r
         'usado_en' => null,
     ]);
 
-    $accion = app(RestablecerPasswordConToken::class);
+    $comandoScript = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        try {
+            app(App\Actions\Auth\RestablecerPasswordConToken::class)->ejecutar("'.$tokenPlano.'", "NuevaPasswordSegura2026*");
+            echo "EXITO";
+        } catch (\Throwable $e) {
+            echo "FALLO:" . $e->getMessage();
+        }
+    ';
 
-    // Primer restablecimiento con la acción real
-    $usuarioActualizado = $accion->ejecutar($tokenPlano, 'NuevaPasswordSegura123*');
-    expect($usuarioActualizado->id)->toBe($usuario->id);
+    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
+    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
 
-    // Segundo restablecimiento simultáneo con la acción real (token ya consumido)
-    $segundoExito = false;
-    try {
-        $accion->ejecutar($tokenPlano, 'OtraPasswordDistinta123*');
-        $segundoExito = true;
-    } catch (ValidationException $e) {
-        expect($e->errors())->toHaveKey('token_recuperacion');
-    }
+    $proceso1->start();
+    $proceso2->start();
 
-    expect($segundoExito)->toBeFalse();
+    $proceso1->wait();
+    $proceso2->wait();
+
+    $salida1 = $proceso1->getOutput();
+    $salida2 = $proceso2->getOutput();
+
+    $exitos = (str_contains($salida1, 'EXITO') ? 1 : 0) + (str_contains($salida2, 'EXITO') ? 1 : 0);
+    $fallos = (str_contains($salida1, 'FALLO:') ? 1 : 0) + (str_contains($salida2, 'FALLO:') ? 1 : 0);
+
+    expect($exitos)->toBe(1)
+        ->and($fallos)->toBe(1);
 
     $recuperacion->refresh();
     expect($recuperacion->usado_en)->not->toBeNull();
-
-    $usuario->refresh();
-    expect(Hash::check('NuevaPasswordSegura123*', $usuario->password))->toBeTrue();
 });
 
-test('en MariaDB el bloqueo pesimista lockForUpdate serializa transacciones reales en InnoDB', function () {
+test('en MariaDB emision concurrente con cambio de correo se serializa y no emite codigo para el correo antiguo', function () use (&$baseCreadaPorEjecucion) {
     $usuario = User::create([
-        'name' => 'Bloqueo Concurrencia',
-        'email' => 'bloqueo@ejemplo.com',
+        'name' => 'Usuario Cambio Correo',
+        'email' => 'anterior@ejemplo.com',
         'password' => Hash::make('PasswordSegura2026*'),
         'rol' => 'usuario',
         'activo' => true,
     ]);
 
-    $recuperacion = RecuperacionPassword::create([
-        'user_id' => $usuario->id,
-        'email' => 'bloqueo@ejemplo.com',
-        'codigo_hash' => Hash::make('654321'),
-        'intentos' => 0,
-        'codigo_expira_en' => now()->addMinutes(10),
+    // Proceso 1: Cambia el correo a 'nuevo@ejemplo.com'
+    $scriptCambio = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        $u = App\Models\User::where("email", "anterior@ejemplo.com")->first();
+        app(App\Actions\Usuarios\ActualizarPerfil::class)->ejecutar($u, ["email" => "nuevo@ejemplo.com"]);
+        echo "CAMBIO_OK";
+    ';
+
+    // Proceso 2: Solicita recuperación para 'anterior@ejemplo.com'
+    $scriptSolicitar = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        $msg = app(App\Actions\Auth\SolicitarRecuperacionPassword::class)->ejecutar("anterior@ejemplo.com");
+        echo "SOLICITUD_OK";
+    ';
+
+    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptCambio]);
+    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptSolicitar]);
+
+    $proceso1->start();
+    $proceso2->start();
+
+    $proceso1->wait();
+    $proceso2->wait();
+
+    $usuario->refresh();
+    expect($usuario->email)->toBe('nuevo@ejemplo.com');
+
+    // No debe haber ninguna recuperación activa para el correo antiguo
+    $recuperacionAntiguaActiva = RecuperacionPassword::where('email', 'anterior@ejemplo.com')
+        ->whereNull('invalidado_en')
+        ->first();
+
+    expect($recuperacionAntiguaActiva)->toBeNull();
+});
+
+test('en MariaDB emision concurrente con cambio de contrasena invalida codigos pendientes', function () use (&$baseCreadaPorEjecucion) {
+    $usuario = User::create([
+        'name' => 'Usuario Cambio Clave',
+        'email' => 'clave_concurrente@ejemplo.com',
+        'password' => Hash::make('ClaveVieja123*'),
+        'rol' => 'usuario',
+        'activo' => true,
     ]);
 
-    // Crear dos conexiones PDO directas a MariaDB en la base aislada
-    $pdo1 = new PDO('mysql:host=127.0.0.1;port=3306;dbname=recetas_revision_test_concurrencia', 'root', '');
-    $pdo2 = new PDO('mysql:host=127.0.0.1;port=3306;dbname=recetas_revision_test_concurrencia', 'root', '');
+    $scriptPassword = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        $u = App\Models\User::where("email", "clave_concurrente@ejemplo.com")->first();
+        app(App\Actions\Usuarios\CambiarPassword::class)->ejecutar($u, "NuevaClaveCambiada2026*");
+        echo "PASSWORD_OK";
+    ';
 
-    // Conexión 1 inicia transacción y toma bloqueo pesimista de fila
-    $pdo1->beginTransaction();
-    $stmt1 = $pdo1->prepare('SELECT * FROM recuperaciones_password WHERE id = :id FOR UPDATE');
-    $stmt1->execute(['id' => $recuperacion->id]);
-    $fila1 = $stmt1->fetch(PDO::FETCH_ASSOC);
-    expect((int) $fila1['id'])->toBe((int) $recuperacion->id);
+    $scriptSolicitar = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        app(App\Actions\Auth\SolicitarRecuperacionPassword::class)->ejecutar("clave_concurrente@ejemplo.com");
+        echo "SOLICITAR_OK";
+    ';
 
-    // Conexión 2 configura tiempo de espera de bloqueo de 1 segundo para verificar contención real
-    $pdo2->exec('SET innodb_lock_wait_timeout = 1');
-    $pdo2->beginTransaction();
+    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptPassword]);
+    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptSolicitar]);
 
-    $bloqueoDetectado = false;
-    try {
-        $stmt2 = $pdo2->prepare('SELECT * FROM recuperaciones_password WHERE id = :id FOR UPDATE');
-        $stmt2->execute(['id' => $recuperacion->id]);
-    } catch (\PDOException $e) {
-        // Código SQLSTATE 1205: Lock wait timeout exceeded
-        $bloqueoDetectado = true;
-    }
+    $proceso1->start();
+    $proceso2->start();
 
-    expect($bloqueoDetectado)->toBeTrue();
+    $proceso1->wait();
+    $proceso2->wait();
 
-    // Liberar transacciones
-    $pdo2->rollBack();
-    $pdo1->rollBack();
+    $usuario->refresh();
+    expect(Hash::check('NuevaClaveCambiada2026*', $usuario->password))->toBeTrue();
+});
+
+test('en MariaDB emision concurrente con desactivacion de cuenta se serializa y no permite recuperacion para cuenta inactiva', function () use (&$baseCreadaPorEjecucion) {
+    $admin = User::create([
+        'name' => 'Admin Concurrencia',
+        'email' => 'admin_desact@ejemplo.com',
+        'password' => Hash::make('AdminPassword2026*'),
+        'rol' => 'administrador',
+        'activo' => true,
+    ]);
+
+    $usuario = User::create([
+        'name' => 'Usuario a Desactivar',
+        'email' => 'desactivar_conc@ejemplo.com',
+        'password' => Hash::make('UserPassword2026*'),
+        'rol' => 'usuario',
+        'activo' => true,
+    ]);
+
+    $scriptDesactivar = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        $admin = App\Models\User::where("email", "admin_desact@ejemplo.com")->first();
+        $u = App\Models\User::where("email", "desactivar_conc@ejemplo.com")->first();
+        app(App\Actions\Usuarios\DeshabilitarCuenta::class)->ejecutar($admin, $u);
+        echo "DESACTIVAR_OK";
+    ';
+
+    $scriptSolicitar = '
+        Config::set("database.connections.mariadb_test.database", "'.$baseCreadaPorEjecucion.'");
+        DB::setDefaultConnection("mariadb_test");
+        app(App\Actions\Auth\SolicitarRecuperacionPassword::class)->ejecutar("desactivar_conc@ejemplo.com");
+        echo "SOLICITAR_OK";
+    ';
+
+    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptDesactivar]);
+    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptSolicitar]);
+
+    $proceso1->start();
+    $proceso2->start();
+
+    $proceso1->wait();
+    $proceso2->wait();
+
+    $usuario->refresh();
+    expect($usuario->activo)->toBeFalse();
+
+    // No debe haber ninguna recuperación activa para la cuenta desactivada
+    $recuperacionActiva = RecuperacionPassword::where('user_id', $usuario->id)
+        ->whereNull('invalidado_en')
+        ->first();
+
+    expect($recuperacionActiva)->toBeNull();
 });

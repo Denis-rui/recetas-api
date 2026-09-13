@@ -34,4 +34,3 @@ class ActualizarFotoPerfilApiRequest extends FormRequest
         ];
     }
 }
-

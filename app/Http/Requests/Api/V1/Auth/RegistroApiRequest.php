@@ -40,4 +40,3 @@ class RegistroApiRequest extends FormRequest
         ];
     }
 }
-

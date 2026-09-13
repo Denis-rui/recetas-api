@@ -47,23 +47,36 @@ class ActualizarCuenta
 
         try {
             DB::transaction(function () use ($usuario, $datos, $nuevaFoto) {
-                $emailAnterior = $usuario->email;
-                $cambioEmail = ($datos['email'] !== $emailAnterior);
+                // Bloqueo pesimista del usuario primero (orden canónico)
+                $userRecord = User::where('id', $usuario->id)->lockForUpdate()->first();
+                if (! $userRecord) {
+                    return;
+                }
 
+                $emailAnterior = $userRecord->email;
+                $cambioEmail = (strtolower((string) $datos['email']) !== strtolower((string) $emailAnterior));
+
+                $userRecord->name = $datos['name'];
+                $userRecord->email = $datos['email'];
                 $usuario->name = $datos['name'];
                 $usuario->email = $datos['email'];
+
                 if ($cambioEmail) {
+                    $userRecord->email_verified_at = null;
                     $usuario->email_verified_at = null;
                 }
                 if ($nuevaFoto !== null) {
+                    $userRecord->foto_perfil = $nuevaFoto;
                     $usuario->foto_perfil = $nuevaFoto;
                 }
-                $usuario->save();
+                $userRecord->save();
 
                 if ($cambioEmail) {
                     DB::table('recuperaciones_password')
-                        ->where('user_id', $usuario->id)
-                        ->orWhere('email', $emailAnterior)
+                        ->where(function ($query) use ($userRecord, $emailAnterior) {
+                            $query->where('user_id', $userRecord->id)
+                                ->orWhere('email', $emailAnterior);
+                        })
                         ->whereNull('invalidado_en')
                         ->update(['invalidado_en' => now()]);
                 }

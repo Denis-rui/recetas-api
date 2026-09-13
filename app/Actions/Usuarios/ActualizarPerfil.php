@@ -48,29 +48,41 @@ class ActualizarPerfil
 
         try {
             DB::transaction(function () use ($usuario, $datos, $nuevaFoto) {
+                // Bloqueo pesimista del usuario primero (orden canónico)
+                $userRecord = User::where('id', $usuario->id)->lockForUpdate()->first();
+                if (! $userRecord) {
+                    return;
+                }
+
                 $cambioEmail = false;
-                $emailAnterior = $usuario->email;
+                $emailAnterior = $userRecord->email;
 
                 if (array_key_exists('name', $datos)) {
+                    $userRecord->name = $datos['name'];
                     $usuario->name = $datos['name'];
                 }
 
-                if (array_key_exists('email', $datos) && $datos['email'] !== $emailAnterior) {
+                if (array_key_exists('email', $datos) && strtolower((string) $datos['email']) !== strtolower((string) $emailAnterior)) {
+                    $userRecord->email = $datos['email'];
+                    $userRecord->email_verified_at = null;
                     $usuario->email = $datos['email'];
                     $usuario->email_verified_at = null;
                     $cambioEmail = true;
                 }
 
                 if ($nuevaFoto !== null) {
+                    $userRecord->foto_perfil = $nuevaFoto;
                     $usuario->foto_perfil = $nuevaFoto;
                 }
 
-                $usuario->save();
+                $userRecord->save();
 
                 if ($cambioEmail) {
                     DB::table('recuperaciones_password')
-                        ->where('user_id', $usuario->id)
-                        ->orWhere('email', $emailAnterior)
+                        ->where(function ($query) use ($userRecord, $emailAnterior) {
+                            $query->where('user_id', $userRecord->id)
+                                ->orWhere('email', $emailAnterior);
+                        })
                         ->whereNull('invalidado_en')
                         ->update(['invalidado_en' => now()]);
                 }
