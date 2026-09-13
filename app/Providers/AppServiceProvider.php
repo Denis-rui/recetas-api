@@ -22,6 +22,45 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $respuestaLimite = function (Request $request, array $headers) {
+            return response()->json([
+                'mensaje' => 'Demasiadas solicitudes. Espere antes de reintentar.',
+                'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+            ], 429, $headers);
+        };
+
+        RateLimiter::for('api-registro', fn (Request $request) => [
+            Limit::perMinute(max(1, (int) config('api.registro_por_minuto', 5)))
+                ->by('registro_minuto:'.$request->ip())->response($respuestaLimite),
+            Limit::perHour(max(1, (int) config('api.registro_por_hora', 20)))
+                ->by('registro_hora:'.$request->ip())->response($respuestaLimite),
+        ]);
+
+        RateLimiter::for('api-recuperacion-restablecer', fn (Request $request) => Limit::perMinute(max(1, (int) config('api.restablecer_por_minuto', 10)))
+            ->by('restablecer:'.$request->ip())->response($respuestaLimite));
+
+        RateLimiter::for('api-disponibilidad', fn (Request $request) => Limit::perMinute(max(1, (int) config('api.disponibilidad_por_minuto', 30)))
+            ->by('disponibilidad:'.$request->ip())->response($respuestaLimite));
+
+        RateLimiter::for('api-escrituras', function (Request $request) use ($respuestaLimite) {
+            if ($request->isMethodSafe() || $request->routeIs('api.v1.auth.logout')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(max(1, (int) config('api.escrituras_por_minuto', 60)))
+                ->by('escrituras:'.($request->user()?->id ?? $request->ip()))
+                ->response($respuestaLimite);
+        });
+
+        RateLimiter::for('api-imagenes', function (Request $request) use ($respuestaLimite) {
+            if (! $request->hasFile('imagen') && ! $request->hasFile('foto_perfil')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(max(1, (int) config('api.imagenes_por_minuto', 10)))
+                ->by('imagenes:'.($request->user()?->id ?? $request->ip()))->response($respuestaLimite);
+        });
+
         RateLimiter::for('listado-usuarios', function (Request $request) {
             // Si no es petición asíncrona (por ejemplo la carga inicial HTML de la vista), no limitar
             if (! ($request->ajax() || $request->wantsJson())) {

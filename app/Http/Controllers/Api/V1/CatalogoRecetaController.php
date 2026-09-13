@@ -9,6 +9,7 @@ use App\Http\Resources\Api\V1\RecetaCatalogoResource;
 use App\Http\Resources\Api\V1\RecetaDetalleResource;
 use App\Models\Ingrediente;
 use App\Models\Receta;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
@@ -76,7 +77,7 @@ class CatalogoRecetaController extends Controller
 
     public function show(mixed $receta): RecetaDetalleResource
     {
-        if (! is_numeric($receta) || (int) $receta <= 0) {
+        if (! IdentificadorEntero::esValido($receta)) {
             abort(404, 'Receta no encontrada.');
         }
 
@@ -108,7 +109,7 @@ class CatalogoRecetaController extends Controller
 
     public function imagen(mixed $receta, ImagenRevision $imagenes): BinaryFileResponse
     {
-        if (! is_numeric($receta) || (int) $receta <= 0) {
+        if (! IdentificadorEntero::esValido($receta)) {
             abort(404, 'Receta no encontrada.');
         }
 

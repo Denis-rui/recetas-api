@@ -5,6 +5,7 @@ namespace App\Actions\Valoraciones;
 use App\Models\Receta;
 use App\Models\User;
 use App\Models\Valoracion;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -33,7 +34,7 @@ class RegistrarValoracion
             ]);
         }
 
-        if (! is_numeric($recetaId) || (int) $recetaId <= 0) {
+        if (! IdentificadorEntero::esValido($recetaId)) {
             abort(404, 'Receta no encontrada.');
         }
 
@@ -68,7 +69,7 @@ class RegistrarValoracion
                 $valoracion->puntuacion = $puntuacion;
                 $valoracion->save();
             } else {
-                $valoracion = new Valoracion();
+                $valoracion = new Valoracion;
                 $valoracion->usuario_id = $userActual->id;
                 $valoracion->receta_id = $receta->id;
                 $valoracion->puntuacion = $puntuacion;
@@ -87,4 +88,3 @@ class RegistrarValoracion
         }, attempts: 3);
     }
 }
-

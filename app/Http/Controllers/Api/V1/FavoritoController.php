@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api\V1;
 use App\Actions\Favoritos\AgregarFavorito;
 use App\Actions\Favoritos\QuitarFavorito;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Api\V1\Favoritos\ListarFavoritosRequest;
 use App\Http\Requests\Api\V1\Favoritos\VerificarDisponibilidadRequest;
 use App\Http\Resources\Api\V1\FavoritoResource;
 use App\Models\Receta;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -18,10 +20,10 @@ class FavoritoController extends Controller
     /**
      * Listado paginado de favoritos del usuario autenticado.
      */
-    public function index(Request $request): AnonymousResourceCollection
+    public function index(ListarFavoritosRequest $request): AnonymousResourceCollection
     {
         $usuario = $request->user();
-        $perPage = (int) $request->input('per_page', 15);
+        $perPage = (int) $request->validated('per_page', 15);
 
         $favoritos = $usuario->favoritos()
             ->withTrashed()
@@ -76,18 +78,22 @@ class FavoritoController extends Controller
      */
     public function estado(Request $request, mixed $receta): JsonResponse
     {
-        if (! is_numeric($receta) || (int) $receta <= 0) {
+        if (! IdentificadorEntero::esValido($receta)) {
             abort(404, 'Receta no encontrada.');
         }
 
         $id = (int) $receta;
-        $recetaExiste = Receta::withTrashed()->whereKey($id)->exists();
+        $recetaExiste = Receta::withTrashed()->whereKey($id)
+            ->where(fn ($query) => $query->whereNotNull('publicada_en')
+                ->orWhere('creado_por', $request->user()->id))
+            ->exists();
 
         if (! $recetaExiste) {
             abort(404, 'Receta no encontrada.');
         }
 
         $esFavorito = $request->user()->favoritos()
+            ->withTrashed()
             ->where('receta_id', $id)
             ->exists();
 
@@ -107,6 +113,7 @@ class FavoritoController extends Controller
 
         $recetas = Receta::withTrashed()
             ->whereIn('id', $ids)
+            ->whereNotNull('publicada_en')
             ->get(['id', 'publicada_en', 'deleted_at', 'tipo_eliminacion'])
             ->keyBy('id');
 
@@ -153,4 +160,3 @@ class FavoritoController extends Controller
         ], Response::HTTP_OK);
     }
 }
-

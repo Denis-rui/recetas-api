@@ -140,7 +140,7 @@ export function inicializarTablaUsuarios(config = {}) {
         } else {
             // 2 o más caracteres: sanear tope de 100 caracteres y buscar
             ocultarAvisoBusqueda();
-            const terminoSanitizado = valorLimpio.slice(0, 100);
+            const terminoSanitizado = Array.from(valorLimpio).slice(0, 100).join("");
             if (terminoSanitizado !== ultimaBusquedaEnviada) {
                 ultimaBusquedaEnviada = terminoSanitizado;
                 tabla.search(terminoSanitizado).draw();

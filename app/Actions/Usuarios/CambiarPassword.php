@@ -4,6 +4,7 @@ namespace App\Actions\Usuarios;
 
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class CambiarPassword
 {
@@ -19,8 +20,11 @@ class CambiarPassword
         return DB::transaction(function () use ($usuario, $nuevaPassword) {
             // Bloqueo pesimista del usuario primero (orden canónico)
             $userRecord = User::where('id', $usuario->id)->lockForUpdate()->first();
-            if (! $userRecord) {
-                return $usuario;
+            if (! $userRecord || ! $userRecord->estaActivo()
+                || ! hash_equals($usuario->password, $userRecord->password)) {
+                throw ValidationException::withMessages([
+                    'current_password' => 'Las credenciales cambiaron o la cuenta está inactiva. Inicie sesión nuevamente.',
+                ]);
             }
 
             $userRecord->password = $nuevaPassword;

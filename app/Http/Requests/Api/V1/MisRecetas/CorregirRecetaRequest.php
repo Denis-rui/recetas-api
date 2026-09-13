@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1\MisRecetas;
 
+use App\Rules\IdentificadorEntero;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CorregirRecetaRequest extends FormRequest
@@ -32,15 +33,15 @@ class CorregirRecetaRequest extends FormRequest
             'contenido' => ['required', 'array:nombre,descripcion,imagen,porciones,tiempo_preparacion,tips,categorias,ingredientes,pasos'],
             'contenido.nombre' => ['required', 'string', 'max:150'],
             'contenido.descripcion' => ['required', 'string', 'max:16000'],
-            'contenido.imagen' => ['required', 'string', 'max:2048'],
+            'contenido.imagen' => ['sometimes', 'required', 'string', 'max:2048'],
             'contenido.porciones' => ['required', 'integer', 'between:1,65535'],
             'contenido.tiempo_preparacion' => ['required', 'integer', 'between:1,65535'],
             'contenido.tips' => ['nullable', 'string', 'max:16000'],
             'contenido.categorias' => ['required', 'array', 'list', 'min:1', 'max:100'],
-            'contenido.categorias.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'contenido.categorias.*' => ['required', new IdentificadorEntero, 'distinct'],
             'contenido.ingredientes' => ['required', 'array', 'list', 'min:1', 'max:500'],
             'contenido.ingredientes.*' => ['required', 'array:ingrediente_id,cantidad,unidad,notas,orden'],
-            'contenido.ingredientes.*.ingrediente_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'contenido.ingredientes.*.ingrediente_id' => ['required', new IdentificadorEntero, 'distinct'],
             'contenido.ingredientes.*.cantidad' => ['present', 'nullable', 'numeric', 'gt:0', 'max:9999999.999', 'decimal:0,3'],
             'contenido.ingredientes.*.unidad' => ['present', 'nullable', 'string', 'max:50'],
             'contenido.ingredientes.*.notas' => ['present', 'nullable', 'string', 'max:16000'],
@@ -52,4 +53,3 @@ class CorregirRecetaRequest extends FormRequest
         ];
     }
 }
-

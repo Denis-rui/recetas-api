@@ -15,12 +15,12 @@ class ProcesarRevision
 {
     public function __construct(private ContenidoRevision $contenido) {}
 
-    public function ejecutar(User $administrador, SolicitudRevision $solicitud, string $decision, ?string $motivo = null): SolicitudRevision
+    public function ejecutar(User $administrador, SolicitudRevision $solicitud, string $decision, ?string $motivo = null, bool $correccionMenorConfirmada = false): SolicitudRevision
     {
         Gate::forUser($administrador)->authorize('decidir', $solicitud);
         Validator::make(['decision' => $decision], ['decision' => ['required', 'in:aprobar,rechazar']])->validate();
 
-        return DB::transaction(function () use ($administrador, $solicitud, $decision, $motivo) {
+        return DB::transaction(function () use ($administrador, $solicitud, $decision, $motivo, $correccionMenorConfirmada) {
             $referencia = SolicitudRevision::findOrFail($solicitud->id);
             /** Orden global: cuentas por id, receta, solicitud, categorías, ingredientes.
              * Los futuros escritores del móvil deberán respetar este mismo orden.
@@ -45,6 +45,9 @@ class ProcesarRevision
             if ($decision === 'aprobar') {
                 if ($bloqueo = $this->motivoBloqueo($actual)) {
                     throw ValidationException::withMessages(['revision' => $bloqueo]);
+                }
+                if ($actual->tipo === 'correccion' && ! $correccionMenorConfirmada) {
+                    throw ValidationException::withMessages(['confirmar_correccion_menor' => 'Verifica que sea una corrección menor. Si transforma la preparación, rechaza la solicitud e indica que debe crearse una receta nueva.']);
                 }
                 $datos = $this->contenido->validar($actual->contenido, $receta, true);
                 $receta->fill(Arr::only($datos, ['nombre', 'descripcion', 'imagen', 'porciones', 'tiempo_preparacion', 'tips']));

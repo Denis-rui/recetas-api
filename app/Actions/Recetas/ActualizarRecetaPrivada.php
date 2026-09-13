@@ -7,6 +7,7 @@ use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
 use App\Models\User;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
@@ -27,6 +28,7 @@ class ActualizarRecetaPrivada
      * Actualiza una receta privada propia garantizando comprobación de versión y ausencia de publicación pendiente.
      *
      * @param  array<string, mixed>  $datos
+     *
      * @throws ValidationException|ConflictHttpException
      */
     public function ejecutar(User $autor, Receta $recetaOriginal, array $datos, UploadedFile|string|null $imagen = null): Receta
@@ -47,10 +49,10 @@ class ActualizarRecetaPrivada
             'tiempo_preparacion' => ['required', 'integer', 'between:1,65535'],
             'tips' => ['nullable', 'string', 'max:16000'],
             'categorias' => ['required', 'array', 'list', 'min:1', 'max:100'],
-            'categorias.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'categorias.*' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
             'ingredientes' => ['required', 'array', 'list', 'min:1', 'max:500'],
             'ingredientes.*' => ['required', 'array:ingrediente_id,cantidad,unidad,notas,orden'],
-            'ingredientes.*.ingrediente_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'ingredientes.*.ingrediente_id' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
             'ingredientes.*.cantidad' => ['present', 'nullable', 'numeric', 'gt:0', 'max:9999999.999', 'decimal:0,3'],
             'ingredientes.*.unidad' => ['present', 'nullable', 'string', 'max:50'],
             'ingredientes.*.notas' => ['present', 'nullable', 'string', 'max:16000'],
@@ -189,4 +191,3 @@ class ActualizarRecetaPrivada
         }
     }
 }
-

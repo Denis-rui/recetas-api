@@ -119,7 +119,7 @@ test('rechazar conserva todos los campos y relaciones vigentes', function (bool 
     $this->assertDatabaseHas('solicitudes_revision', ['id' => $solicitud->id, 'estado' => 'rechazada', 'motivo_rechazo' => 'Explica mejor los pasos.']);
 })->with([false, true]);
 
-test('una correccion reemplaza relaciones y conserva favoritos y valoraciones', function () {
+test('una correccion confirmada como menor reemplaza relaciones y conserva favoritos y valoraciones', function () {
     $solicitud = ejemploRevision(true);
     $receta = $solicitud->receta;
     $publicadaEn = $receta->publicada_en;
@@ -132,7 +132,7 @@ test('una correccion reemplaza relaciones y conserva favoritos y valoraciones', 
     $receta->usuariosQueLaGuardaron()->attach($valoracion->usuario_id);
     $favorito = DB::table('favoritos')->where('receta_id', $receta->id)->first();
 
-    $this->actingAs(adminRevision())->post("/revision-recetas/{$solicitud->id}/aprobar")->assertSessionHas('exito');
+    $this->actingAs(adminRevision())->post("/revision-recetas/{$solicitud->id}/aprobar", ['confirmar_correccion_menor' => '1'])->assertSessionHas('exito');
 
     expect($receta->fresh()->publicada_en->equalTo($publicadaEn))->toBeTrue();
     expect($valoracion->fresh()->toArray())->toEqual($valoracion->toArray());
@@ -177,7 +177,7 @@ test('revierte incluso campos y pivotes si falla la escritura de pasos', functio
     });
 
     try {
-        $this->actingAs(adminRevision())->post("/revision-recetas/{$solicitud->id}/aprobar")->assertSessionHas('error');
+        $this->actingAs(adminRevision())->post("/revision-recetas/{$solicitud->id}/aprobar", ['confirmar_correccion_menor' => '1'])->assertSessionHas('error');
     } finally {
         PasoReceta::flushEventListeners();
     }

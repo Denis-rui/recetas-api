@@ -79,7 +79,7 @@ El usuario podrá explorar recetas, buscar por nombre y aplicar filtros por cate
 - En los resultados o en su presentación asociada deberá poder reconocer los ingredientes disponibles y los faltantes.
 - El propósito es evitar que el usuario revise manualmente cada receta para hacer esa comparación.
 
-Queda pendiente precisar la regla de compatibilidad, el orden de los resultados, el tratamiento de cantidades y la duración de la selección. No convertir esta función en un inventario permanente de despensa sin confirmarlo.
+Decisiones confirmadas: se incluye una receta si coincide al menos un ingrediente por su identificador. Se ordenan primero las que tienen menos ingredientes faltantes; los empates se resuelven por fecha de publicación descendente y luego identificador descendente. Se muestran disponibles y faltantes, sin comparar cantidades. La selección se conserva mientras la futura app esté abierta, incluso al cambiar de pantalla, y se borra al cerrarla por completo. La app enviará los identificadores en cada consulta; Laravel no guarda esta selección ni un inventario de despensa.
 
 ### 4.4. Detalle de una receta
 
@@ -148,14 +148,14 @@ Cuando un invitado ingrese a «Mi perfil», verá una imagen anónima y un mensa
 
 #### Correcciones de una receta publicada
 
-- Se permiten correcciones menores, como ortografía o redacción que no altere la preparación. Las enviadas por usuarios normales están sujetas a revisión; los administradores aplican directamente las correcciones menores de sus propias recetas.
+- Se permiten correcciones menores, como ortografía o redacción que no altere la preparación. Todas las correcciones se envían a revisión administrativa, incluidas las propuestas por administradores sobre sus propias recetas.
 - La versión aprobada permanece visible mientras se revisa la modificación. Los cambios pendientes se conservan por separado del contenido publicado.
 - Al aprobar la corrección, se actualiza la versión publicada y se conservan sus valoraciones.
 - Al rechazarla, permanece la versión aprobada y el autor recibe una explicación para corregir y reenviar.
 - El autor también puede cancelar una solicitud de corrección pendiente: se cancela el envío, sin modificar ni retirar la receta ya publicada ni sus valoraciones. Una solicitud aprobada no puede cancelarse.
 - Los cambios importantes en ingredientes, cantidades o método que transformen la preparación deberán enviarse como una receta nueva, con identidad y valoraciones independientes.
 - El administrador evalúa si el cambio es una corrección menor. Si transforma la receta, rechaza la modificación y explica que debe presentarse como una nueva publicación.
-- El administrador puede publicar recetas propias y aplicar correcciones menores en ellas sin revisión de otro administrador. Si transforma la preparación mediante cambios importantes, debe crear una receta nueva, que también publica directamente y comienza sin heredar valoraciones. Esta autorización sobre recetas propias no define permisos de edición sobre recetas ajenas.
+- El administrador puede publicar inicialmente recetas propias de forma directa. Sus correcciones posteriores también pasan por el flujo de revisión. Al aprobar una corrección se exige confirmar expresamente que conserva la preparación; la clasificación es manual, sin restricciones arbitrarias por campo. Si transforma la preparación mediante cambios importantes, debe crear una receta nueva, que publica directamente y comienza sin heredar valoraciones. No se ha definido una prohibición de revisar solicitudes propias ni se amplían permisos sobre recetas ajenas.
 
 #### Eliminación por el autor y moderación administrativa
 
@@ -378,8 +378,8 @@ Estas prácticas se propusieron para el equipo; no se ha comprobado que estén c
 
 ## 10. Decisiones que deben aclararse antes de implementarlas
 
-1. Regla de compatibilidad por ingredientes: coincidencia completa o parcial, orden de resultados y comparación de cantidades.
-2. Persistencia de la selección de ingredientes al cerrar la aplicación.
+1. Resuelto: compatibilidad por al menos un ingrediente, menos faltantes primero, empate por fecha e ID descendentes y comparación solo por identificador.
+2. Resuelto: selección conservada mientras la app esté abierta; se borra al cerrarla por completo, sin persistencia en Laravel.
 3. Si una receta puede pertenecer a una o varias categorías.
 4. Contenido que se descarga al guardar en favoritos y momento de la descarga. Ya se confirmó que una copia descargada puede consultarse sin conexión y que, al confirmar su eliminación con el servidor, se deja de mostrar el contenido y se conserva el aviso en favoritos.
 5. Tratamiento de favoritos locales al iniciar sesión o registrarse y posibles duplicados.
@@ -392,7 +392,7 @@ Estas prácticas se propusieron para el equipo; no se ha comprobado que estén c
 12. Reparto detallado de programación del backend, calendario y alcance de cada entrega.
 13. Alojamiento, copias de seguridad y acceso al backend desde dispositivos para las pruebas.
 14. Detalles técnicos para resolver revisiones simultáneas sin aprobar envíos cancelados ni aplicar decisiones sobre un estado desactualizado. Ya se confirmaron los estados Pendiente de revisión, Aprobada, Rechazada y Cancelada para publicaciones y correcciones. Cancelar una publicación inicial conserva la receta privada; cancelar una corrección conserva la versión pública. Para editar una publicación inicial pendiente se cancela primero y se vuelve a enviar después de los cambios.
-15. Aplicación de alertas de duplicados a la publicación directa de administradores y permisos de edición sobre recetas ajenas. Ya se confirmó que el administrador publica y corrige sus propias recetas sin revisión, manteniendo la obligación de crear una receta nueva ante cambios importantes y sin trasladar valoraciones.
+15. Aplicación de alertas de duplicados a la publicación directa de administradores y permisos de edición sobre recetas ajenas. El administrador publica inicialmente sus propias recetas sin revisión; todas las correcciones posteriores pasan por revisión administrativa. Los cambios importantes requieren una receta nueva, sin trasladar valoraciones.
 16. Detalles de borradores locales al cerrar sesión o cambiar de cuenta y al confirmar que se guardaron en la cuenta o se enviaron a revisión. Las recetas privadas se conservan en el servidor; los borradores no se sincronizan.
 17. Criterios y algoritmo para alertas de duplicados, incluyendo qué estados de otras recetas se comparan. No fijar porcentajes sin validarlos con ejemplos.
 18. Retirada de valoraciones por su autor, si se desea permitirla; por ahora solo se ha confirmado que podrá modificarlas.

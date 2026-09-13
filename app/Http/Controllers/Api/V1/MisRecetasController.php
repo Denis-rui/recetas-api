@@ -20,6 +20,7 @@ use App\Http\Resources\Api\V1\MiRecetaCatalogoResource;
 use App\Http\Resources\Api\V1\MiRecetaDetalleResource;
 use App\Http\Resources\Api\V1\MiSolicitudCatalogoResource;
 use App\Models\Receta;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -67,7 +68,7 @@ class MisRecetasController extends Controller
             $query->whereRaw("nombre LIKE ? ESCAPE '!'", ["%{$busquedaEscapada}%"]);
         }
 
-        $perPage = (int) $request->input('per_page', 15);
+        $perPage = (int) $request->validated('per_page', 15);
 
         $recetas = $query
             ->orderByDesc('id')
@@ -218,7 +219,7 @@ class MisRecetasController extends Controller
     }
 
     /**
-     * Envía una propuesta de corrección sobre una receta publicada (o la aplica directamente si es administrador).
+     * Envía una propuesta de corrección sobre una receta publicada para revisión.
      */
     public function corregir(CorregirRecetaRequest $request, mixed $receta, SolicitarCorreccionReceta $accion): JsonResponse
     {
@@ -229,13 +230,6 @@ class MisRecetasController extends Controller
         $claveIdempotencia = (string) $request->validated('clave_idempotencia');
 
         $resultado = $accion->ejecutar($request->user(), $recetaModel, $propuesta, $versionBase, $claveIdempotencia);
-
-        if ($resultado['tipo'] === 'directa') {
-            return response()->json([
-                'mensaje' => 'Corrección menor aplicada directamente sobre la receta publicada.',
-                'receta' => new MiRecetaDetalleResource($resultado['receta']),
-            ], Response::HTTP_OK);
-        }
 
         $status = ! empty($resultado['reintento']) ? Response::HTTP_OK : Response::HTTP_CREATED;
 
@@ -252,7 +246,7 @@ class MisRecetasController extends Controller
      */
     private function obtenerRecetaAutorizada(Request $request, mixed $receta): Receta
     {
-        if (! is_numeric($receta) || (int) $receta <= 0) {
+        if (! IdentificadorEntero::esValido($receta)) {
             abort(404, 'Receta no encontrada.');
         }
 

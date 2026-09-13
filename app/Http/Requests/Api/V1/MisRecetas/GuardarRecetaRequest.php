@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests\Api\V1\MisRecetas;
 
+use App\Rules\IdentificadorEntero;
 use Illuminate\Foundation\Http\FormRequest;
 
 class GuardarRecetaRequest extends FormRequest
@@ -40,10 +41,10 @@ class GuardarRecetaRequest extends FormRequest
             'tiempo_preparacion' => ['required', 'integer', 'between:1,65535'],
             'tips' => ['nullable', 'string', 'max:16000'],
             'categorias' => ['required', 'array', 'list', 'min:1', 'max:100'],
-            'categorias.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'categorias.*' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
             'ingredientes' => ['required', 'array', 'list', 'min:1', 'max:500'],
             'ingredientes.*' => ['required', 'array:ingrediente_id,cantidad,unidad,notas,orden'],
-            'ingredientes.*.ingrediente_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'ingredientes.*.ingrediente_id' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
             'ingredientes.*.cantidad' => ['present', 'nullable', 'numeric', 'gt:0', 'max:9999999.999', 'decimal:0,3'],
             'ingredientes.*.unidad' => ['present', 'nullable', 'string', 'max:50'],
             'ingredientes.*.notas' => ['present', 'nullable', 'string', 'max:16000'],
@@ -55,4 +56,3 @@ class GuardarRecetaRequest extends FormRequest
         ];
     }
 }
-

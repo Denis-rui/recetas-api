@@ -8,6 +8,7 @@ use App\Actions\Recetas\ProcesarRevision;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Revision\DecidirRevisionRequest;
 use App\Models\SolicitudRevision;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,6 +26,7 @@ class RevisionRecetaController extends Controller
         Gate::authorize('viewAny', SolicitudRevision::class);
         try {
             $filtros = $request->validate([
+                'page' => ['sometimes', 'bail', new IdentificadorEntero, 'integer', 'max:'.intdiv(PHP_INT_MAX, 15)],
                 'estado' => ['sometimes', Rule::in(['pendiente', 'aprobada', 'rechazada', 'cancelada', 'todos'])],
                 'tipo' => ['sometimes', Rule::in(['publicacion', 'correccion', 'todos'])],
             ], ['in' => 'El filtro :attribute no es válido.']);
@@ -66,7 +68,7 @@ class RevisionRecetaController extends Controller
     {
         $destino = redirect()->route('revision-recetas.show', $solicitud);
         try {
-            $accion->ejecutar($request->user(), $solicitud, $decision, $request->validated('motivo_rechazo'));
+            $accion->ejecutar($request->user(), $solicitud, $decision, $request->validated('motivo_rechazo'), $request->boolean('confirmar_correccion_menor'));
         } catch (ValidationException $exception) {
             return $destino->withErrors($exception->errors())->withInput($request->only('motivo_rechazo'));
         } catch (AuthorizationException $exception) {

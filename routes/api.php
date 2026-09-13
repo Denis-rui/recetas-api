@@ -26,12 +26,14 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     Route::get('/categorias', [CatalogoCategoriaController::class, 'index'])->name('categorias.index');
     Route::get('/ingredientes', [CatalogoIngredienteController::class, 'index'])->name('ingredientes.index');
     Route::get('/recetas', [CatalogoRecetaController::class, 'index'])->name('recetas.index');
+    Route::post('/recetas/verificar-disponibilidad', [FavoritoController::class, 'verificarDisponibilidad'])
+        ->middleware('throttle:api-disponibilidad')->name('recetas.verificar-disponibilidad');
     Route::get('/recetas/{receta}', [CatalogoRecetaController::class, 'show'])->name('recetas.show');
     Route::get('/recetas/{receta}/imagen', [CatalogoRecetaController::class, 'imagen'])->name('recetas.imagen');
 
     // Rutas públicas de autenticación y recuperación de contraseña
     Route::prefix('auth')->name('auth.')->group(function () {
-        Route::post('/registro', [AuthController::class, 'registro'])->name('registro');
+        Route::post('/registro', [AuthController::class, 'registro'])->middleware('throttle:api-registro')->name('registro');
         Route::post('/login', [AuthController::class, 'login'])
             ->middleware('throttle:api-login')
             ->name('login');
@@ -44,29 +46,30 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
                 ->middleware('throttle:api-recuperacion-verificar')
                 ->name('verificar');
             Route::post('/restablecer', [RecuperacionPasswordController::class, 'restablecer'])
+                ->middleware('throttle:api-recuperacion-restablecer')
                 ->name('restablecer');
         });
     });
 
     // Rutas protegidas para cuentas activas (tokens móviles de Sanctum)
-    Route::middleware(['auth:sanctum', 'api.activo'])->group(function () {
+    Route::middleware(['auth:sanctum', 'api.activo', 'throttle:api-escrituras'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
 
         Route::prefix('perfil')->name('perfil.')->group(function () {
             Route::get('/', [PerfilController::class, 'show'])->name('show');
             Route::patch('/', [PerfilController::class, 'update'])->name('update');
-            Route::post('/foto', [PerfilController::class, 'actualizarFoto'])->name('foto');
+            Route::post('/foto', [PerfilController::class, 'actualizarFoto'])->middleware('throttle:api-imagenes')->name('foto');
             Route::put('/password', [PerfilController::class, 'cambiarPassword'])->name('password');
         });
 
         Route::prefix('mis-recetas')->name('mis-recetas.')->group(function () {
             Route::get('/', [MisRecetasController::class, 'index'])->name('index');
-            Route::post('/', [MisRecetasController::class, 'store'])->name('store');
+            Route::post('/', [MisRecetasController::class, 'store'])->middleware('throttle:api-imagenes')->name('store');
             Route::get('/{receta}', [MisRecetasController::class, 'show'])->name('show');
-            Route::match(['put', 'patch', 'post'], '/{receta}', [MisRecetasController::class, 'update'])->name('update');
+            Route::match(['put', 'patch', 'post'], '/{receta}', [MisRecetasController::class, 'update'])->middleware('throttle:api-imagenes')->name('update');
             Route::delete('/{receta}', [MisRecetasController::class, 'destroy'])->name('destroy');
             Route::get('/{receta}/imagen', [MisRecetasController::class, 'imagen'])->name('imagen');
-            Route::post('/{receta}/imagen', [MisRecetasController::class, 'subirImagen'])->name('subir-imagen');
+            Route::post('/{receta}/imagen', [MisRecetasController::class, 'subirImagen'])->middleware('throttle:api-imagenes')->name('subir-imagen');
             Route::post('/{receta}/publicar', [MisRecetasController::class, 'publicar'])->name('publicar');
             Route::post('/{receta}/corregir', [MisRecetasController::class, 'corregir'])->name('corregir');
         });

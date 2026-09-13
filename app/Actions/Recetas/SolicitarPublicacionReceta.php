@@ -12,6 +12,7 @@ class SolicitarPublicacionReceta
 {
     public function __construct(
         private ContenidoRevision $contenidoRevision,
+        private IdempotenciaReceta $idempotencia,
     ) {}
 
     /**
@@ -44,6 +45,11 @@ class SolicitarPublicacionReceta
                 abort(403, 'No tiene permiso para solicitar la publicación de esta receta.');
             }
 
+            $reintento = $this->idempotencia->recuperar($userActual, $receta, $claveIdempotencia, 'publicacion', []);
+            if ($reintento !== null) {
+                return $reintento;
+            }
+
             if ($receta->trashed()) {
                 throw ValidationException::withMessages(['receta' => 'Una receta eliminada no se puede publicar.']);
             }
@@ -52,32 +58,8 @@ class SolicitarPublicacionReceta
                 throw ValidationException::withMessages(['receta' => 'La receta ya se encuentra publicada.']);
             }
 
-            // Comprobar idempotencia antes de crear nueva solicitud
-            $solicitudExistente = SolicitudRevision::where('solicitado_por', $userActual->id)
-                ->where('clave_idempotencia', $claveIdempotencia)
-                ->lockForUpdate()
-                ->first();
-
-            // Extraer y validar el contenido actual de la receta
             $contenido = $this->contenidoRevision->vigente($receta);
             $contenidoValidado = $this->contenidoRevision->validar($contenido, $receta, true);
-
-            if ($solicitudExistente) {
-                if ($solicitudExistente->receta_id === $receta->id
-                    && $solicitudExistente->tipo === 'publicacion'
-                    && $solicitudExistente->contenido === $contenidoValidado) {
-                    return [
-                        'tipo' => 'solicitud',
-                        'receta' => $receta,
-                        'solicitud' => $solicitudExistente,
-                        'reintento' => true,
-                    ];
-                }
-
-                throw ValidationException::withMessages([
-                    'clave_idempotencia' => 'La clave de idempotencia ya fue utilizada para otra solicitud distinta.',
-                ]);
-            }
 
             // Comprobar que no exista otra solicitud pendiente para esta misma receta
             $pendienteExistente = SolicitudRevision::where('receta_id', $receta->id)
@@ -98,6 +80,7 @@ class SolicitarPublicacionReceta
                 $receta->actualizado_por = $userActual->id;
                 $receta->version++;
                 $receta->save();
+                $this->idempotencia->registrar($userActual, $receta, $claveIdempotencia, 'publicacion', []);
 
                 return [
                     'tipo' => 'directa',
@@ -106,7 +89,7 @@ class SolicitarPublicacionReceta
             }
 
             // Usuario normal: crea solicitud de revisión pendiente
-            $solicitud = new SolicitudRevision();
+            $solicitud = new SolicitudRevision;
             $solicitud->receta_id = $receta->id;
             $solicitud->solicitado_por = $userActual->id;
             $solicitud->tipo = 'publicacion';
@@ -115,6 +98,7 @@ class SolicitarPublicacionReceta
             $solicitud->contenido = $contenidoValidado;
             $solicitud->clave_idempotencia = $claveIdempotencia;
             $solicitud->save();
+            $this->idempotencia->registrar($userActual, $receta, $claveIdempotencia, 'publicacion', [], $solicitud);
 
             return [
                 'tipo' => 'solicitud',

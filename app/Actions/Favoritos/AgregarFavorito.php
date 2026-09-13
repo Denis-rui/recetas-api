@@ -4,6 +4,7 @@ namespace App\Actions\Favoritos;
 
 use App\Models\Receta;
 use App\Models\User;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -23,7 +24,7 @@ class AgregarFavorito
             ]);
         }
 
-        if (! is_numeric($recetaId) || (int) $recetaId <= 0) {
+        if (! IdentificadorEntero::esValido($recetaId)) {
             abort(404, 'Receta no encontrada.');
         }
 
@@ -60,4 +61,3 @@ class AgregarFavorito
         }, attempts: 3);
     }
 }
-

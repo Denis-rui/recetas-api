@@ -271,7 +271,7 @@ test('aprobacion de correccion en revision web conserva las valoraciones intacta
     // El administrador aprueba la corrección desde la web
     app('auth')->forgetGuards();
     $this->flushHeaders();
-    $this->actingAs($this->admin)->post("/revision-recetas/{$solicitud->id}/aprobar")
+    $this->actingAs($this->admin)->post("/revision-recetas/{$solicitud->id}/aprobar", ['confirmar_correccion_menor' => '1'])
         ->assertSessionHas('exito');
 
     // Comprobar que la valoración sigue existiendo intacta

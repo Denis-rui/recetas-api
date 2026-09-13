@@ -5,6 +5,7 @@ namespace App\Actions\Recetas;
 use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 
@@ -25,10 +26,10 @@ class ContenidoRevision
             'contenido.tiempo_preparacion' => ['required', 'integer', 'between:1,65535'],
             'contenido.tips' => ['nullable', 'string', 'max:16000'],
             'contenido.categorias' => ['required', 'array', 'list', 'min:1', 'max:100'],
-            'contenido.categorias.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'contenido.categorias.*' => ['required', new IdentificadorEntero, 'distinct'],
             'contenido.ingredientes' => ['required', 'array', 'list', 'min:1', 'max:500'],
             'contenido.ingredientes.*' => ['required', 'array:ingrediente_id,cantidad,unidad,notas,orden'],
-            'contenido.ingredientes.*.ingrediente_id' => ['required', 'integer', 'min:1', 'distinct'],
+            'contenido.ingredientes.*.ingrediente_id' => ['required', new IdentificadorEntero, 'distinct'],
             'contenido.ingredientes.*.cantidad' => ['present', 'nullable', 'numeric', 'gt:0', 'max:9999999.999', 'decimal:0,3'],
             'contenido.ingredientes.*.unidad' => ['present', 'nullable', 'string', 'max:50'],
             'contenido.ingredientes.*.notas' => ['present', 'nullable', 'string', 'max:16000'],
@@ -97,7 +98,13 @@ class ContenidoRevision
             return preg_replace('/\\A[\\s\\p{Z}\\p{Cf}]+|[\\s\\p{Z}\\p{Cf}]+\\z/u', '', $valor) ?? $valor;
         }
         if (is_array($valor)) {
-            return array_map(fn (mixed $elemento) => $this->normalizar($elemento), $valor);
+            foreach ($valor as $clave => $elemento) {
+                if (! in_array($clave, ['categorias', 'ingrediente_id'], true)) {
+                    $valor[$clave] = $this->normalizar($elemento);
+                }
+            }
+
+            return $valor;
         }
 
         return $valor;

@@ -1,5 +1,7 @@
 <?php
 
+use App\Actions\Auth\IniciarSesionApi;
+use App\Actions\Usuarios\ReactivarCuenta;
 use App\Models\RecuperacionPassword;
 use App\Models\User;
 use Illuminate\Support\Facades\Artisan;
@@ -9,102 +11,127 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Symfony\Component\Process\Process;
 
-// Propiedad de la base de datos creada exclusivamente en esta ejecución
+global $baseCreadaPorEjecucion, $pdoPropietario, $conexionOriginal, $procesosMariaDbTest;
 $baseCreadaPorEjecucion = null;
+$pdoPropietario = null;
+$conexionOriginal = null;
+$procesosMariaDbTest = [];
+
+pest()->group('concurrencia-mariadb');
 
 function obtenerCredencialesMariaDbTest(): ?array
 {
-    $host = config('database.connections.mariadb_test.host');
-    $port = config('database.connections.mariadb_test.port', '3306');
-    $username = config('database.connections.mariadb_test.username');
-    $password = config('database.connections.mariadb_test.password');
+    $configuracion = config('database.connections.mariadb_test');
 
-    // Comprobación estricta de seguridad: no utilizar valores de respaldo inseguros (como root o password vacía por defecto)
-    if (empty($host) || empty($username)) {
+    if (empty($configuracion['host']) || empty($configuracion['username'])) {
         return null;
     }
 
-    return [
-        'host' => (string) $host,
-        'port' => (string) $port,
-        'username' => (string) $username,
-        'password' => (string) ($password ?? ''),
-    ];
+    return $configuracion;
 }
 
-function conectarPdoMariaDbTest(array $credenciales): ?PDO
+function crearProcesoMariaDbTest(string $script): Process
 {
-    try {
-        $dsn = "mysql:host={$credenciales['host']};port={$credenciales['port']}";
+    global $procesosMariaDbTest;
 
-        return new PDO($dsn, $credenciales['username'], $credenciales['password'], [
-            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-            PDO::ATTR_TIMEOUT => 3,
-        ]);
-    } catch (Throwable $e) {
-        return null;
+    $bootstrap = <<<'PHP'
+    use Illuminate\Support\Facades\Config;
+    use Illuminate\Support\Facades\DB;
+    require 'vendor/autoload.php';
+    $app = require 'bootstrap/app.php';
+    $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+    $configuracion = json_decode(base64_decode(getenv('PRUEBA_CONEXION')), true, flags: JSON_THROW_ON_ERROR);
+    if (! preg_match('/\Arecetas_revision_test_concurrencia_[a-f0-9]+\z/', $configuracion['database'])) {
+        throw new RuntimeException('Base de prueba no autorizada.');
     }
+    Config::set('database.connections.mariadb_test', $configuracion);
+    Config::set('cache.default', 'array');
+    Config::set('mail.default', 'array');
+    Config::set('queue.default', 'sync');
+    DB::setDefaultConnection('mariadb_test');
+    Illuminate\Support\Facades\Mail::fake();
+    PHP;
+
+    $proceso = new Process([PHP_BINARY, '-r', $bootstrap."\n".$script], base_path(), [
+        'APP_ENV' => 'testing',
+        'APP_CONFIG_CACHE' => base_path('storage/framework/cache/config-concurrencia-no-existente.php'),
+        'CACHE_STORE' => 'array',
+        'MAIL_MAILER' => 'array',
+        'QUEUE_CONNECTION' => 'sync',
+        'SESSION_DRIVER' => 'array',
+        'PRUEBA_CONEXION' => base64_encode(json_encode(config('database.connections.mariadb_test'), JSON_THROW_ON_ERROR)),
+    ], timeout: 15);
+    $procesosMariaDbTest[] = $proceso;
+
+    return $proceso;
 }
 
-beforeEach(function () use (&$baseCreadaPorEjecucion) {
+function limpiarBaseMariaDbTest(): void
+{
+    global $baseCreadaPorEjecucion, $pdoPropietario, $conexionOriginal, $procesosMariaDbTest;
+
+    foreach ($procesosMariaDbTest as $proceso) {
+        if ($proceso->isRunning()) {
+            $proceso->stop(1);
+        }
+    }
+    $procesosMariaDbTest = [];
+    DB::purge('mariadb_test');
+
+    if ($conexionOriginal !== null) {
+        DB::setDefaultConnection($conexionOriginal);
+    }
+
+    if ($baseCreadaPorEjecucion !== null && $pdoPropietario instanceof PDO) {
+        if (! preg_match('/\Arecetas_revision_test_concurrencia_[a-f0-9]+\z/', $baseCreadaPorEjecucion)) {
+            throw new RuntimeException('Se rechazó limpiar una base ajena a la prueba.');
+        }
+
+        $pdoPropietario->exec("DROP DATABASE `{$baseCreadaPorEjecucion}`");
+        $comprobacion = $pdoPropietario->prepare('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = ?');
+        $comprobacion->execute([$baseCreadaPorEjecucion]);
+        expect($comprobacion->fetchColumn())->toBeFalse();
+    }
+
+    $baseCreadaPorEjecucion = null;
+    $pdoPropietario = null;
+    $conexionOriginal = null;
+}
+
+beforeEach(function () use (&$baseCreadaPorEjecucion, &$pdoPropietario, &$conexionOriginal) {
     $credenciales = obtenerCredencialesMariaDbTest();
 
     if ($credenciales === null) {
-        $this->markTestSkipped('No existe una configuración explícita de pruebas para MariaDB (DB_TEST_HOST y DB_TEST_USERNAME no configurados en .env). Pruebas de concurrencia en MariaDB omitidas para proteger el entorno.');
+        $this->markTestSkipped('Configure DB_TEST_HOST y DB_TEST_USERNAME explícitamente para concurrencia real en MariaDB.');
     }
 
-    $pdo = conectarPdoMariaDbTest($credenciales);
-
-    if ($pdo === null) {
-        $this->markTestSkipped("No fue posible conectar al servidor MariaDB de pruebas en {$credenciales['host']}:{$credenciales['port']}. Pruebas omitidas.");
-    }
-
-    // Generar un nombre único por ejecución para garantizar aislamiento estricto
-    $nombreBase = 'recetas_test_concurrencia_'.bin2hex(random_bytes(6));
-
-    // Abortar si la base ya existe en information_schema (no se asume propiedad de bases previas)
-    $stmtCheck = $pdo->prepare('SELECT SCHEMA_NAME FROM information_schema.SCHEMATA WHERE SCHEMA_NAME = :nombre');
-    $stmtCheck->execute(['nombre' => $nombreBase]);
-    if ($stmtCheck->fetch()) {
-        throw new RuntimeException("La base de datos {$nombreBase} ya existe. Abortando para evitar colisión de pruebas.");
-    }
-
-    // Crear la base de datos única sin IF NOT EXISTS
-    $pdo->exec("CREATE DATABASE `{$nombreBase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
-
-    // Registrar la propiedad únicamente después del éxito de CREATE DATABASE
+    $conexionOriginal = DB::getDefaultConnection();
+    $pdoPropietario = new PDO(
+        "mysql:host={$credenciales['host']};port={$credenciales['port']}",
+        $credenciales['username'],
+        $credenciales['password'] ?? '',
+        [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION, PDO::ATTR_TIMEOUT => 3],
+    );
+    $nombreBase = 'recetas_revision_test_concurrencia_'.bin2hex(random_bytes(6));
+    $pdoPropietario->exec("CREATE DATABASE `{$nombreBase}` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $baseCreadaPorEjecucion = $nombreBase;
 
-    // Configurar conexión mariadb_test con la base única
-    Config::set('database.connections.mariadb_test.database', $nombreBase);
-    DB::purge('mariadb_test');
-    DB::setDefaultConnection('mariadb_test');
+    try {
+        Config::set('database.connections.mariadb_test.database', $nombreBase);
+        DB::purge('mariadb_test');
+        DB::setDefaultConnection('mariadb_test');
+        expect(DB::selectOne('SELECT DATABASE() AS nombre')->nombre)->toBe($nombreBase);
+        expect(Artisan::call('migrate', ['--database' => 'mariadb_test', '--force' => true, '--no-interaction' => true]))->toBe(0);
+    } catch (Throwable $exception) {
+        limpiarBaseMariaDbTest();
 
-    // Ejecutar migraciones en la base única recién creada
-    Artisan::call('migrate:fresh', [
-        '--database' => 'mariadb_test',
-        '--force' => true,
-    ]);
+        throw $exception;
+    }
 });
 
 afterEach(function () {
-    DB::setDefaultConnection('sqlite');
+    limpiarBaseMariaDbTest();
 });
-
-afterAll(function () use (&$baseCreadaPorEjecucion) {
-    if ($baseCreadaPorEjecucion !== null) {
-        $credenciales = obtenerCredencialesMariaDbTest();
-        if ($credenciales !== null) {
-            $pdo = conectarPdoMariaDbTest($credenciales);
-            if ($pdo !== null) {
-                // Eliminar únicamente la base de datos creada por esta ejecución específica
-                $pdo->exec("DROP DATABASE IF EXISTS `{$baseCreadaPorEjecucion}`");
-            }
-        }
-        $baseCreadaPorEjecucion = null;
-    }
-});
-
 test('en MariaDB dos verificaciones simultaneas del mismo codigo en procesos independientes solo permiten un exito', function () use (&$baseCreadaPorEjecucion) {
     $usuario = User::create([
         'name' => 'Usuario Concurrencia',
@@ -129,21 +156,23 @@ test('en MariaDB dos verificaciones simultaneas del mismo codigo en procesos ind
         try {
             $token = app(App\Actions\Auth\VerificarCodigoRecuperacion::class)->ejecutar("concurrente@ejemplo.com", "'.$codigo.'");
             echo "EXITO:" . $token;
-        } catch (\Throwable $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             echo "FALLO:" . $e->getMessage();
         }
     ';
 
-    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
-    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
+    $proceso1 = crearProcesoMariaDbTest($comandoScript);
+    $proceso2 = crearProcesoMariaDbTest($comandoScript);
 
     // Iniciar ambos procesos en paralelo de forma asíncrona
     $proceso1->start();
     $proceso2->start();
 
-    // Esperas limitadas (máximo 8 segundos)
+    // Ambos procesos tienen el timeout acotado del helper.
     $proceso1->wait();
     $proceso2->wait();
+    expect($proceso1->isSuccessful())->toBeTrue($proceso1->getErrorOutput());
+    expect($proceso2->isSuccessful())->toBeTrue($proceso2->getErrorOutput());
 
     $salida1 = $proceso1->getOutput();
     $salida2 = $proceso2->getOutput();
@@ -187,19 +216,21 @@ test('en MariaDB dos restablecimientos simultaneos del mismo token en procesos i
         try {
             app(App\Actions\Auth\RestablecerPasswordConToken::class)->ejecutar("'.$tokenPlano.'", "NuevaPasswordSegura2026*");
             echo "EXITO";
-        } catch (\Throwable $e) {
+        } catch (\Illuminate\Validation\ValidationException $e) {
             echo "FALLO:" . $e->getMessage();
         }
     ';
 
-    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
-    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$comandoScript]);
+    $proceso1 = crearProcesoMariaDbTest($comandoScript);
+    $proceso2 = crearProcesoMariaDbTest($comandoScript);
 
     $proceso1->start();
     $proceso2->start();
 
     $proceso1->wait();
     $proceso2->wait();
+    expect($proceso1->isSuccessful())->toBeTrue($proceso1->getErrorOutput());
+    expect($proceso2->isSuccessful())->toBeTrue($proceso2->getErrorOutput());
 
     $salida1 = $proceso1->getOutput();
     $salida2 = $proceso2->getOutput();
@@ -240,14 +271,16 @@ test('en MariaDB emision concurrente con cambio de correo se serializa y no emit
         echo "SOLICITUD_OK";
     ';
 
-    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptCambio]);
-    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptSolicitar]);
+    $proceso1 = crearProcesoMariaDbTest($scriptCambio);
+    $proceso2 = crearProcesoMariaDbTest($scriptSolicitar);
 
     $proceso1->start();
     $proceso2->start();
 
     $proceso1->wait();
     $proceso2->wait();
+    expect($proceso1->isSuccessful())->toBeTrue($proceso1->getErrorOutput());
+    expect($proceso2->isSuccessful())->toBeTrue($proceso2->getErrorOutput());
 
     $usuario->refresh();
     expect($usuario->email)->toBe('nuevo@ejemplo.com');
@@ -284,14 +317,16 @@ test('en MariaDB emision concurrente con cambio de contrasena invalida codigos p
         echo "SOLICITAR_OK";
     ';
 
-    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptPassword]);
-    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptSolicitar]);
+    $proceso1 = crearProcesoMariaDbTest($scriptPassword);
+    $proceso2 = crearProcesoMariaDbTest($scriptSolicitar);
 
     $proceso1->start();
     $proceso2->start();
 
     $proceso1->wait();
     $proceso2->wait();
+    expect($proceso1->isSuccessful())->toBeTrue($proceso1->getErrorOutput());
+    expect($proceso2->isSuccessful())->toBeTrue($proceso2->getErrorOutput());
 
     $usuario->refresh();
     expect(Hash::check('NuevaClaveCambiada2026*', $usuario->password))->toBeTrue();
@@ -330,14 +365,16 @@ test('en MariaDB emision concurrente con desactivacion de cuenta se serializa y 
         echo "SOLICITAR_OK";
     ';
 
-    $proceso1 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptDesactivar]);
-    $proceso2 = new Process([PHP_BINARY, 'artisan', 'tinker', '--execute='.$scriptSolicitar]);
+    $proceso1 = crearProcesoMariaDbTest($scriptDesactivar);
+    $proceso2 = crearProcesoMariaDbTest($scriptSolicitar);
 
     $proceso1->start();
     $proceso2->start();
 
     $proceso1->wait();
     $proceso2->wait();
+    expect($proceso1->isSuccessful())->toBeTrue($proceso1->getErrorOutput());
+    expect($proceso2->isSuccessful())->toBeTrue($proceso2->getErrorOutput());
 
     $usuario->refresh();
     expect($usuario->activo)->toBeFalse();
@@ -349,3 +386,135 @@ test('en MariaDB emision concurrente con desactivacion de cuenta se serializa y 
 
     expect($recuperacionActiva)->toBeNull();
 });
+
+function esperarBloqueoMariaDbTest(Process $proceso): void
+{
+    global $pdoPropietario;
+
+    expect($proceso->waitUntil(fn (string $tipo, string $salida): bool => str_contains($proceso->getOutput(), 'ESPERANDO_BLOQUEO')))
+        ->toBeTrue($proceso->getErrorOutput());
+    preg_match('/CONEXION:(\d+)/', $proceso->getOutput(), $coincidencia);
+    expect($coincidencia)->toHaveCount(2);
+    $consulta = $pdoPropietario->prepare('SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS AS espera JOIN information_schema.INNODB_TRX AS transaccion ON transaccion.trx_id = espera.requesting_trx_id WHERE transaccion.trx_mysql_thread_id = ?');
+    $limite = microtime(true) + 5;
+    do {
+        $consulta->execute([(int) $coincidencia[1]]);
+        if ((int) $consulta->fetchColumn() > 0) {
+            return;
+        }
+        usleep(10000);
+    } while ($proceso->isRunning() && microtime(true) < $limite);
+
+    throw new RuntimeException('No se observó la espera real de bloqueo en MariaDB.');
+}
+
+function observarBloqueoMariaDbTest(): string
+{
+    return <<<'PHP'
+    echo 'CONEXION:'.DB::selectOne('SELECT CONNECTION_ID() AS id')->id."\n";
+    DB::connection()->beforeExecuting(function (string $sql): void {
+        if (str_contains(strtolower($sql), 'for update')) {
+            echo "ESPERANDO_BLOQUEO\n";
+            fflush(STDOUT);
+        }
+    });
+    PHP;
+}
+
+function prepararRevocacionMariaDbTest(User $usuario, User $admin, string $operacion): string
+{
+    $token = Str::random(64);
+    RecuperacionPassword::create([
+        'user_id' => $usuario->id,
+        'email' => $usuario->email,
+        'codigo_hash' => Hash::make('739281'),
+        'codigo_expira_en' => now()->addMinutes(10),
+        'codigo_verificado_en' => now(),
+        'token_recuperacion_hash' => hash('sha256', $token),
+        'token_expira_en' => now()->addMinutes(15),
+    ]);
+
+    return match ($operacion) {
+        'deshabilitar' => 'app(App\\Actions\\Usuarios\\DeshabilitarCuenta::class)->ejecutar(App\\Models\\User::findOrFail('.$admin->id.'), App\\Models\\User::findOrFail('.$usuario->id.'));',
+        'cambiar' => 'app(App\\Actions\\Usuarios\\CambiarPassword::class)->ejecutar(App\\Models\\User::findOrFail('.$usuario->id.'), "NuevaSegura2026*");',
+        'restablecer' => 'app(App\\Actions\\Auth\\RestablecerPasswordConToken::class)->ejecutar("'.$token.'", "NuevaSegura2026*");',
+    };
+}
+
+test('MariaDB login espera la revocacion y rechaza credenciales anteriores sin emitir token', function (string $operacion) {
+    $admin = User::factory()->create(['rol' => 'administrador']);
+    $usuario = User::factory()->create(['password' => 'AnteriorSegura2026*']);
+    $revocar = prepararRevocacionMariaDbTest($usuario, $admin, $operacion);
+    $proceso = crearProcesoMariaDbTest(observarBloqueoMariaDbTest().'
+        $resultado = app(App\\Actions\\Auth\\IniciarSesionApi::class)->ejecutar("'.$usuario->email.'", "AnteriorSegura2026*", "Concurrencia");
+        echo $resultado === null ? "LOGIN_RECHAZADO" : "TOKEN_RESIDUAL";
+    ');
+
+    DB::beginTransaction();
+    try {
+        User::query()->whereKey($usuario->id)->lockForUpdate()->firstOrFail();
+        $proceso->start();
+        esperarBloqueoMariaDbTest($proceso);
+        eval($revocar);
+        DB::commit();
+        $proceso->wait();
+        expect($proceso->isSuccessful())->toBeTrue($proceso->getErrorOutput());
+        expect($proceso->getOutput())->toContain('LOGIN_RECHAZADO')->not->toContain('TOKEN_RESIDUAL');
+        expect($usuario->tokens()->count())->toBe(0);
+    } finally {
+        if (DB::transactionLevel() > 0) {
+            DB::rollBack();
+        }
+    }
+})->with(['deshabilitar', 'cambiar', 'restablecer']);
+
+test('MariaDB revocacion espera al login y elimina el token que este acaba de emitir', function (string $operacion) {
+    $admin = User::factory()->create(['rol' => 'administrador']);
+    $usuario = User::factory()->create(['password' => 'AnteriorSegura2026*']);
+    $revocar = prepararRevocacionMariaDbTest($usuario, $admin, $operacion);
+    $proceso = crearProcesoMariaDbTest(observarBloqueoMariaDbTest().$revocar.' echo "REVOCACION_OK";');
+
+    DB::beginTransaction();
+    try {
+        $resultado = app(IniciarSesionApi::class)->ejecutar($usuario->email, 'AnteriorSegura2026*', 'Concurrencia');
+        expect($resultado)->not->toBeNull();
+        $proceso->start();
+        esperarBloqueoMariaDbTest($proceso);
+        DB::commit();
+        $proceso->wait();
+        expect($proceso->isSuccessful())->toBeTrue($proceso->getErrorOutput());
+        expect($proceso->getOutput())->toContain('REVOCACION_OK');
+        expect($usuario->tokens()->count())->toBe(0);
+
+        if ($operacion === 'deshabilitar') {
+            app(ReactivarCuenta::class)->ejecutar($admin, $usuario->fresh());
+        }
+        app('auth')->forgetGuards();
+        $this->withToken($resultado['token'])->getJson('/api/v1/perfil')->assertUnauthorized();
+    } finally {
+        if (DB::transactionLevel() > 0) {
+            DB::rollBack();
+        }
+    }
+})->with(['deshabilitar', 'cambiar', 'restablecer']);
+
+test('MariaDB la migracion de expiracion conserva los datos anteriores y elimina la actualizacion automatica', function () {
+    $migracion = require database_path('migrations/2026_09_13_210516_fijar_expiracion_codigo_recuperacion.php');
+    $migracion->down();
+    $usuario = User::factory()->create();
+    $recuperacion = RecuperacionPassword::create([
+        'user_id' => $usuario->id,
+        'email' => $usuario->email,
+        'codigo_hash' => Hash::make('739281'),
+        'codigo_expira_en' => now()->addMinutes(10),
+    ])->fresh();
+    $antes = $recuperacion->getAttributes();
+
+    $migracion->up();
+
+    expect($recuperacion->fresh()->getAttributes())->toBe($antes);
+    $recuperacion->update(['intentos' => 1]);
+    expect($recuperacion->fresh()->codigo_expira_en->toDateTimeString())->toBe($antes['codigo_expira_en']);
+    $columna = DB::selectOne("SHOW COLUMNS FROM recuperaciones_password WHERE Field = 'codigo_expira_en'");
+    expect($columna->Extra)->not->toContain('on update');
+})->group('migracion-mariadb');

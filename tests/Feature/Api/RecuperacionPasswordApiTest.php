@@ -164,6 +164,8 @@ test('verificar con codigo incorrecto persiste el contador de intentos y se inva
         'codigo_expira_en' => now()->addMinutes(10),
     ]);
 
+    $expiracionOriginal = $recuperacion->codigo_expira_en->toDateTimeString();
+
     // 1 intento fallido
     $response = $this->postJson('/api/v1/auth/recuperacion/verificar', [
         'email' => 'usuario@ejemplo.com',
@@ -175,6 +177,7 @@ test('verificar con codigo incorrecto persiste el contador de intentos y se inva
 
     $recuperacion->refresh();
     expect($recuperacion->intentos)->toBe(1);
+    expect($recuperacion->codigo_expira_en->toDateTimeString())->toBe($expiracionOriginal);
 
     // Intentos 2, 3, 4
     for ($i = 2; $i <= 4; $i++) {
@@ -371,7 +374,7 @@ test('cifrado nativo de Laravel en la cola garantiza que el codigo de 6 digitos 
     ]);
 
     // Limpiar tabla jobs y usar el driver database
-    DB::table('jobs')->truncate();
+    DB::table('jobs')->delete();
     Config::set('queue.default', 'database');
 
     $codigoSecreto = '849201';

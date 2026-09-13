@@ -53,6 +53,12 @@
             <div class="mt-4 flex flex-col gap-6">
                 <form method="POST" action="{{ route('revision-recetas.aprobar', $solicitud) }}" data-decision="aprobar">
                     @csrf
+                    @if($solicitud->tipo === 'correccion')
+                        <label class="mb-4 flex items-start gap-3 text-sm text-slate-700">
+                            <input type="checkbox" name="confirmar_correccion_menor" value="1" required class="mt-1">
+                            <span>He revisado título, ingredientes, cantidades y pasos: es una corrección menor que conserva la preparación. Si la transforma (por ejemplo, de arroz a ceviche), debo rechazarla y solicitar una receta nueva, con sus propias valoraciones.</span>
+                        </label>
+                    @endif
                     <button type="submit" disabled data-bloqueado="{{ $bloqueo !== null ? 'true' : 'false' }}" class="cursor-pointer rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">Aprobar {{ $solicitud->tipo === 'correccion' ? 'corrección' : 'publicación' }}</button>
                     <noscript><p class="mt-2 text-sm text-amber-800">Activa JavaScript para confirmar la aprobación.</p></noscript>
                 </form>

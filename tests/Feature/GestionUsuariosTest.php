@@ -515,6 +515,9 @@ test('el rate limiter de consultas asincronas devuelve 429 al superarse y es ind
 });
 
 test('las solicitudes de busqueda vacias, de un caracter y de dos o mas caracteres cumplen las reglas', function () {
+    // En MariaDB unicode_ci, «Ña» también coincide con «na» del dominio quecocinamos.
+    // El administrador de control debe tener un correo que no coincida con la búsqueda.
+    $this->admin->update(['email' => 'admin@ejemplo.test']);
     User::create([
         'name' => 'José Ñandú',
         'email' => 'jose.nandu@quecocinamos.com',

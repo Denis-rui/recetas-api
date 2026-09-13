@@ -9,6 +9,7 @@ use App\Http\Requests\Api\V1\MisSolicitudes\ListarMisSolicitudesRequest;
 use App\Http\Resources\Api\V1\MiSolicitudCatalogoResource;
 use App\Http\Resources\Api\V1\MiSolicitudDetalleResource;
 use App\Models\SolicitudRevision;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
@@ -38,7 +39,7 @@ class MisSolicitudesController extends Controller
             $query->where('tipo', $tipo);
         }
 
-        $perPage = (int) $request->input('per_page', 15);
+        $perPage = (int) $request->validated('per_page', 15);
 
         $solicitudes = $query
             ->orderByDesc('created_at')
@@ -105,7 +106,7 @@ class MisSolicitudesController extends Controller
      */
     private function obtenerSolicitudAutorizada(Request $request, mixed $solicitud): SolicitudRevision
     {
-        if (! is_numeric($solicitud) || (int) $solicitud <= 0) {
+        if (! IdentificadorEntero::esValido($solicitud)) {
             abort(404, 'Solicitud no encontrada.');
         }
 
@@ -123,4 +124,3 @@ class MisSolicitudesController extends Controller
         return $solicitudModel;
     }
 }
-

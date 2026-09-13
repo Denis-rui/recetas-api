@@ -15,6 +15,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->trimStrings(except: [
+            'ids.*', 'categoria_id', 'ingredientes.*', 'categorias.*',
+            'ingredientes.*.ingrediente_id', 'contenido.categorias.*',
+            'contenido.ingredientes.*.ingrediente_id',
+        ]);
         $middleware->alias([
             'admin.activo' => VerificarAdministradorActivo::class,
             'api.activo' => VerificarCuentaActivaApi::class,

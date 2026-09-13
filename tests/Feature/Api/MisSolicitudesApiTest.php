@@ -328,7 +328,7 @@ test('propuesta de correccion mantiene inalterada la receta publicada hasta su a
     expect($catalogoItem->json('data.nombre'))->toBe($nombreOriginal);
 
     // Administrador aprueba la corrección desde la web
-    $this->actingAs($this->admin)->post("/revision-recetas/{$solicitudId}/aprobar")
+    $this->actingAs($this->admin)->post("/revision-recetas/{$solicitudId}/aprobar", ['confirmar_correccion_menor' => '1'])
         ->assertSessionHas('exito');
 
     // Ahora la receta publicada tiene el nuevo nombre
@@ -341,7 +341,7 @@ test('propuesta de correccion mantiene inalterada la receta publicada hasta su a
     expect(DB::table('favoritos')->where('receta_id', $receta->id)->count())->toBe(1);
 });
 
-test('administrador activo aplica correccion menor directa sobre su receta publicada', function () {
+test('administrador activo envia su correccion a revision sin modificar la receta publicada', function () {
     $recetaAdmin = crearRecetaCompleta($this->admin, publicada: true);
 
     $propuesta = [
@@ -378,13 +378,14 @@ test('administrador activo aplica correccion menor directa sobre su receta publi
             'contenido' => $propuesta,
         ]);
 
-    $response->assertOk()
-        ->assertJsonPath('mensaje', 'Corrección menor aplicada directamente sobre la receta publicada.')
-        ->assertJsonPath('receta.nombre', 'Mazamorra Admin Corregida Directa');
+    $response->assertCreated()
+        ->assertJsonPath('solicitud.tipo', 'correccion')
+        ->assertJsonPath('solicitud.estado', 'pendiente');
 
     $recetaActualizada = $recetaAdmin->fresh();
-    expect($recetaActualizada->nombre)->toBe('Mazamorra Admin Corregida Directa');
-    expect($recetaActualizada->version)->toBe(2);
+    expect($recetaActualizada->nombre)->toBe($recetaAdmin->nombre);
+    expect($recetaActualizada->version)->toBe(1);
+    expect(SolicitudRevision::findOrFail($response->json('solicitud.id'))->contenido)->toMatchArray($propuesta);
 });
 
 test('detalle de solicitud propia resuelve nombres de ingredientes y categorias sin exponer datos del revisor', function () {
@@ -430,4 +431,3 @@ test('detalle de solicitud propia resuelve nombres de ingredientes y categorias 
         ->assertJsonPath('data.contenido.ingredientes.0.nombre', 'Azúcar')
         ->assertJsonMissing(['revisado_por', 'revisor']);
 });
-

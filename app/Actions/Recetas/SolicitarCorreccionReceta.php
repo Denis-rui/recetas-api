@@ -5,7 +5,6 @@ namespace App\Actions\Recetas;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
 use App\Models\User;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -13,15 +12,15 @@ class SolicitarCorreccionReceta
 {
     public function __construct(
         private ContenidoRevision $contenidoRevision,
+        private IdempotenciaReceta $idempotencia,
     ) {}
 
     /**
      * Procesa una propuesta de corrección sobre una receta publicada.
-     * Si es un administrador activo, aplica directamente la corrección menor sobre la receta.
-     * Si es un usuario normal, genera una SolicitudRevision de tipo 'correccion' en estado pendiente.
+     * Toda corrección, incluida la de un administrador, genera una solicitud pendiente.
      *
      * @param  array<string, mixed>  $propuesta
-     * @return array{tipo: 'directa'|'solicitud', receta: Receta, solicitud?: SolicitudRevision}
+     * @return array{tipo: 'solicitud', receta: Receta, solicitud: SolicitudRevision}
      *
      * @throws ValidationException
      */
@@ -46,6 +45,12 @@ class SolicitarCorreccionReceta
                 abort(403, 'No tiene permiso para proponer correcciones a esta receta.');
             }
 
+            $peticion = ['version_base' => $versionBase, 'contenido' => $propuesta];
+            $reintento = $this->idempotencia->recuperar($userActual, $receta, $claveIdempotencia, 'correccion', $peticion);
+            if ($reintento !== null) {
+                return $reintento;
+            }
+
             if ($receta->trashed()) {
                 throw ValidationException::withMessages(['receta' => 'Una receta eliminada no se puede corregir.']);
             }
@@ -61,30 +66,10 @@ class SolicitarCorreccionReceta
             }
 
             // Validar la propuesta con ContenidoRevision
-            $propuestaValidada = $this->contenidoRevision->validar($propuesta, $receta, true);
-
-            // Comprobar idempotencia
-            $solicitudExistente = SolicitudRevision::where('solicitado_por', $userActual->id)
-                ->where('clave_idempotencia', $claveIdempotencia)
-                ->lockForUpdate()
-                ->first();
-
-            if ($solicitudExistente) {
-                if ($solicitudExistente->receta_id === $receta->id
-                    && $solicitudExistente->tipo === 'correccion'
-                    && $solicitudExistente->contenido === $propuestaValidada) {
-                    return [
-                        'tipo' => 'solicitud',
-                        'receta' => $receta,
-                        'solicitud' => $solicitudExistente,
-                        'reintento' => true,
-                    ];
-                }
-
-                throw ValidationException::withMessages([
-                    'clave_idempotencia' => 'La clave de idempotencia ya fue utilizada para otra solicitud distinta.',
-                ]);
+            if (! array_key_exists('imagen', $propuesta)) {
+                $propuesta['imagen'] = $receta->imagen;
             }
+            $propuestaValidada = $this->contenidoRevision->validar($propuesta, $receta, true);
 
             // Comprobar que no exista otra solicitud pendiente para esta misma receta
             $pendienteExistente = SolicitudRevision::where('receta_id', $receta->id)
@@ -98,34 +83,7 @@ class SolicitarCorreccionReceta
                 ]);
             }
 
-            // Bifurcación por rol
-            if ($userActual->esAdministrador()) {
-                // El administrador aplica directamente su corrección menor
-                $receta->fill(Arr::only($propuestaValidada, ['nombre', 'descripcion', 'imagen', 'porciones', 'tiempo_preparacion', 'tips']));
-                $receta->actualizado_por = $userActual->id;
-                $receta->version++;
-                $receta->save();
-
-                // Sincronizar relaciones
-                $receta->categorias()->sync($propuestaValidada['categorias']);
-
-                $pivotes = [];
-                foreach ($propuestaValidada['ingredientes'] as $ingrediente) {
-                    $pivotes[$ingrediente['ingrediente_id']] = Arr::except($ingrediente, 'ingrediente_id');
-                }
-                $receta->ingredientes()->sync($pivotes);
-
-                $receta->pasos()->delete();
-                $receta->pasos()->createMany($propuestaValidada['pasos']);
-
-                return [
-                    'tipo' => 'directa',
-                    'receta' => $receta->fresh(['categorias', 'ingredientes', 'pasos']),
-                ];
-            }
-
-            // Usuario normal: guarda propuesta separada en SolicitudRevision pendiente
-            $solicitud = new SolicitudRevision();
+            $solicitud = new SolicitudRevision;
             $solicitud->receta_id = $receta->id;
             $solicitud->solicitado_por = $userActual->id;
             $solicitud->tipo = 'correccion';
@@ -134,6 +92,7 @@ class SolicitarCorreccionReceta
             $solicitud->contenido = $propuestaValidada;
             $solicitud->clave_idempotencia = $claveIdempotencia;
             $solicitud->save();
+            $this->idempotencia->registrar($userActual, $receta, $claveIdempotencia, 'correccion', $peticion, $solicitud);
 
             return [
                 'tipo' => 'solicitud',

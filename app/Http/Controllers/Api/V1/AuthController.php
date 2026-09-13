@@ -2,15 +2,14 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Auth\IniciarSesionApi;
 use App\Actions\Auth\RegistrarUsuarioApi;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Auth\LoginApiRequest;
 use App\Http\Requests\Api\V1\Auth\RegistroApiRequest;
 use App\Http\Resources\Api\V1\PerfilResource;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Symfony\Component\HttpFoundation\Response;
 
 class AuthController extends Controller
@@ -31,31 +30,29 @@ class AuthController extends Controller
     /**
      * Inicia sesión para usuarios normales y administradores activos, devolviendo el Bearer token (200 OK).
      */
-    public function login(LoginApiRequest $request): JsonResponse
+    public function login(LoginApiRequest $request, IniciarSesionApi $accion): JsonResponse
     {
         $emailNormalizado = strtolower(trim((string) $request->input('email')));
         $password = (string) $request->input('password');
 
-        $usuario = User::where('email', $emailNormalizado)->first();
+        $resultado = $accion->ejecutar(
+            $emailNormalizado,
+            $password,
+            $request->filled('dispositivo') ? (string) $request->input('dispositivo') : 'Dispositivo móvil',
+        );
 
         // Rechazo genérico tanto si no existe, si la contraseña es errónea o si la cuenta está deshabilitada
-        if (! $usuario || ! Hash::check($password, $usuario->password) || ! $usuario->estaActivo()) {
+        if ($resultado === null) {
             return response()->json([
                 'mensaje' => 'Las credenciales proporcionadas son incorrectas o la cuenta se encuentra inactiva.',
             ], Response::HTTP_UNAUTHORIZED);
         }
 
-        $dispositivo = $request->filled('dispositivo')
-            ? (string) $request->input('dispositivo')
-            : 'Dispositivo móvil';
-
-        $token = $usuario->createToken($dispositivo)->plainTextToken;
-
         return response()->json([
             'mensaje' => 'Inicio de sesión exitoso.',
-            'token' => $token,
+            'token' => $resultado['token'],
             'token_type' => 'Bearer',
-            'usuario' => new PerfilResource($usuario),
+            'usuario' => new PerfilResource($resultado['usuario']),
         ], Response::HTTP_OK);
     }
 

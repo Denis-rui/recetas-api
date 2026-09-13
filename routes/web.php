@@ -6,6 +6,9 @@ use App\Http\Controllers\Web\RevisionRecetaController;
 use App\Http\Controllers\Web\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
+Route::pattern('usuario', '[1-9][0-9]*');
+Route::pattern('solicitud', '[1-9][0-9]*');
+
 // Rutas de acceso (invitados)
 Route::middleware('guest')->group(function () {
     Route::get('/login', [AuthController::class, 'mostrarLogin'])->name('login');

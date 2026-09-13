@@ -2,13 +2,14 @@
 
 namespace App\Http\Requests\Api\V1\Favoritos;
 
+use App\Rules\IdentificadorEntero;
 use Illuminate\Foundation\Http\FormRequest;
 
 class VerificarDisponibilidadRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null && $this->user()->estaActivo();
+        return true;
     }
 
     /**
@@ -18,7 +19,7 @@ class VerificarDisponibilidadRequest extends FormRequest
     {
         return [
             'ids' => ['required', 'array', 'list', 'min:1', 'max:50'],
-            'ids.*' => ['required', 'integer', 'min:1', 'distinct'],
+            'ids.*' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
         ];
     }
 
@@ -38,4 +39,3 @@ class VerificarDisponibilidadRequest extends FormRequest
         ];
     }
 }
-

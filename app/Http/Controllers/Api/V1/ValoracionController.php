@@ -8,6 +8,7 @@ use App\Http\Requests\Api\V1\Valoraciones\GuardarValoracionRequest;
 use App\Http\Resources\Api\V1\MiValoracionResource;
 use App\Models\Receta;
 use App\Models\Valoracion;
+use App\Rules\IdentificadorEntero;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
@@ -19,7 +20,7 @@ class ValoracionController extends Controller
      */
     public function show(Request $request, mixed $receta): MiValoracionResource
     {
-        if (! is_numeric($receta) || (int) $receta <= 0) {
+        if (! IdentificadorEntero::esValido($receta)) {
             abort(404, 'Receta no encontrada.');
         }
 
@@ -67,4 +68,3 @@ class ValoracionController extends Controller
         ], Response::HTTP_OK);
     }
 }
-
