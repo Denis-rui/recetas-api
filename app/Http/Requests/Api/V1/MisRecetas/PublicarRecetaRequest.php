@@ -32,3 +32,4 @@ class PublicarRecetaRequest extends FormRequest
         ];
     }
 }
+

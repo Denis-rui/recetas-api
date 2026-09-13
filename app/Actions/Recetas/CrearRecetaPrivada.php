@@ -25,7 +25,6 @@ class CrearRecetaPrivada
      * Guarda una receta privada completa vinculada a la cuenta autora.
      *
      * @param  array<string, mixed>  $datos
-     *
      * @throws ValidationException
      */
     public function ejecutar(User $autor, array $datos, UploadedFile|string|null $imagen): Receta
@@ -105,7 +104,7 @@ class CrearRecetaPrivada
                 }
 
                 // Crear el registro base de la receta privada
-                $receta = new Receta;
+                $receta = new Receta();
                 $receta->nombre = $validados['nombre'];
                 $receta->descripcion = $validados['descripcion'];
                 $receta->imagen = 'pendiente.png'; // Temporal antes de asignar el archivo real
@@ -163,3 +162,4 @@ class CrearRecetaPrivada
         }
     }
 }
+

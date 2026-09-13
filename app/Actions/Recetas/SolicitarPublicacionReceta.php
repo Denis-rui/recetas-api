@@ -106,7 +106,7 @@ class SolicitarPublicacionReceta
             }
 
             // Usuario normal: crea solicitud de revisión pendiente
-            $solicitud = new SolicitudRevision;
+            $solicitud = new SolicitudRevision();
             $solicitud->receta_id = $receta->id;
             $solicitud->solicitado_por = $userActual->id;
             $solicitud->tipo = 'publicacion';

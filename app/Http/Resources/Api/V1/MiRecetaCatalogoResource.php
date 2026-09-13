@@ -66,3 +66,4 @@ class MiRecetaCatalogoResource extends JsonResource
         return $datos;
     }
 }
+

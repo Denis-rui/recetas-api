@@ -55,3 +55,4 @@ class GuardarRecetaRequest extends FormRequest
         ];
     }
 }
+

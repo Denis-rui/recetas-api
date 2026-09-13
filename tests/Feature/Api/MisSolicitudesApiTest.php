@@ -430,3 +430,4 @@ test('detalle de solicitud propia resuelve nombres de ingredientes y categorias 
         ->assertJsonPath('data.contenido.ingredientes.0.nombre', 'Azúcar')
         ->assertJsonMissing(['revisado_por', 'revisor']);
 });
+

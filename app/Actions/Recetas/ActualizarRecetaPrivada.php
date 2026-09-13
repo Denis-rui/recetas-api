@@ -27,7 +27,6 @@ class ActualizarRecetaPrivada
      * Actualiza una receta privada propia garantizando comprobación de versión y ausencia de publicación pendiente.
      *
      * @param  array<string, mixed>  $datos
-     *
      * @throws ValidationException|ConflictHttpException
      */
     public function ejecutar(User $autor, Receta $recetaOriginal, array $datos, UploadedFile|string|null $imagen = null): Receta
@@ -190,3 +189,4 @@ class ActualizarRecetaPrivada
         }
     }
 }
+

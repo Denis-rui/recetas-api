@@ -56,3 +56,4 @@ class ActualizarRecetaRequest extends FormRequest
         ];
     }
 }
+

@@ -31,3 +31,4 @@ class MiSolicitudCatalogoResource extends JsonResource
         ];
     }
 }
+

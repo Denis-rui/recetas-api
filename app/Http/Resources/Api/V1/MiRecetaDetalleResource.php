@@ -84,3 +84,4 @@ class MiRecetaDetalleResource extends JsonResource
         ];
     }
 }
+

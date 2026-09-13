@@ -125,7 +125,7 @@ class SolicitarCorreccionReceta
             }
 
             // Usuario normal: guarda propuesta separada en SolicitudRevision pendiente
-            $solicitud = new SolicitudRevision;
+            $solicitud = new SolicitudRevision();
             $solicitud->receta_id = $receta->id;
             $solicitud->solicitado_por = $userActual->id;
             $solicitud->tipo = 'correccion';

@@ -74,3 +74,4 @@ class MiSolicitudDetalleResource extends JsonResource
         ];
     }
 }
+
