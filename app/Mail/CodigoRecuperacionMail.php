@@ -41,6 +41,7 @@ class CodigoRecuperacionMail extends Mailable implements ShouldBeEncrypted, Shou
     {
         return new Content(
             view: 'emails.codigo-recuperacion',
+            text: 'emails.codigo-recuperacion-text',
             with: [
                 'codigo' => $this->codigo,
                 'minutosValidez' => $this->minutosValidez,
