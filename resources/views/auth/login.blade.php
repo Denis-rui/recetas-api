@@ -35,7 +35,7 @@
                    value="{{ old('email') }}" 
                    required 
                    autofocus 
-                   placeholder="ejemplo@quecocinamos.com"
+                   placeholder="ejemplo@quepreparamos.com"
                    class="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-hidden transition">
         </div>
 

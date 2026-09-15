@@ -1,4 +1,4 @@
-¿Qué Cocinamos?
+¿Qué Preparamos?
 
 Hola,
 
@@ -10,5 +10,5 @@ Este código es válido durante {{ $minutosValidez }} minutos y puede usarse una
 
 Aviso de seguridad: Si no solicitaste este código, puedes ignorar este mensaje. Tu contraseña actual permanecerá segura y no se realizará ningún cambio en tu cuenta.
 
-© {{ date('Y') }} ¿Qué Cocinamos?. Todos los derechos reservados.
+© {{ date('Y') }} ¿Qué Preparamos?. Todos los derechos reservados.
 

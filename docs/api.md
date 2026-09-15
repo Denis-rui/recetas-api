@@ -1,4 +1,4 @@
-# Contrato HTTP de ¿Qué Cocinamos?
+# Contrato HTTP de ¿Qué preparamos?
 
 Contrato del código revisado el 13 de septiembre de 2026. Backend Laravel 13.31.0, Sanctum 4.3.3 y PHP CLI 8.5. La aplicación React Native/Expo todavía no existe. Los ejemplos describen solicitudes y respuestas del backend; los identificadores son ilustrativos y deben sustituirse por registros existentes.
 
@@ -16,16 +16,16 @@ Enviar enteros positivos o su representación decimal canónica: `1` o `"1"`. Se
 
 ### Errores
 
-| Estado | Significado |
-| --- | --- |
-| 400 | Solicitud HTTP que el servidor no puede interpretar. |
-| 401 | Falta autenticación, token inválido/vencido/revocado o login rechazado. |
-| 403 | Cuenta deshabilitada detectada con acceso residual o falta de permiso. |
-| 404 | Ruta/recurso no encontrado o no disponible en ese contexto de consulta. |
-| 409 | Conflicto de versión al actualizar una receta privada. |
-| 422 | Validación o regla funcional incumplida; incluye versión de corrección desactualizada y clave de idempotencia reutilizada. |
-| 429 | Límite de solicitudes; respetar la cabecera `Retry-After`. |
-| 500 | Error del servidor; no confirma eliminación ni éxito de una escritura. |
+| Estado | Significado                                                                                                                |
+| ------ | -------------------------------------------------------------------------------------------------------------------------- |
+| 400    | Solicitud HTTP que el servidor no puede interpretar.                                                                       |
+| 401    | Falta autenticación, token inválido/vencido/revocado o login rechazado.                                                    |
+| 403    | Cuenta deshabilitada detectada con acceso residual o falta de permiso.                                                     |
+| 404    | Ruta/recurso no encontrado o no disponible en ese contexto de consulta.                                                    |
+| 409    | Conflicto de versión al actualizar una receta privada.                                                                     |
+| 422    | Validación o regla funcional incumplida; incluye versión de corrección desactualizada y clave de idempotencia reutilizada. |
+| 429    | Límite de solicitudes; respetar la cabecera `Retry-After`.                                                                 |
+| 500    | Error del servidor; no confirma eliminación ni éxito de una escritura.                                                     |
 
 Las excepciones de rutas `api/*` se presentan como JSON incluso sin cabecera `Accept`. Se mantiene la compatibilidad existente: los mensajes de las acciones HTTP usan normalmente `mensaje`, mientras que las excepciones de Laravel utilizan `message`. Un cliente debe leer `mensaje ?? message` y no depender del texto exacto ni de su idioma para decidir el resultado.
 
@@ -33,10 +33,10 @@ Ejemplo de validación:
 
 ```json
 {
-  "message": "La cantidad por página debe estar entre 1 y 50.",
-  "errors": {
-    "per_page": ["La cantidad por página debe estar entre 1 y 50."]
-  }
+    "message": "La cantidad por página debe estar entre 1 y 50.",
+    "errors": {
+        "per_page": ["La cantidad por página debe estar entre 1 y 50."]
+    }
 }
 ```
 
@@ -44,14 +44,14 @@ Los errores 429 incluyen `mensaje`, `retry_after` en segundos y `Retry-After`. E
 
 ## 2. Cuentas, acceso y recuperación
 
-| Método y ruta | Entrada | Éxito |
-| --- | --- | --- |
-| `POST /auth/registro` | `name`, `email`, `password`, `password_confirmation` | 201: `mensaje`, `usuario`. |
-| `POST /auth/login` | `email`, `password`; `dispositivo` opcional | 200: `mensaje`, `token`, `token_type: "Bearer"`, `usuario`. |
-| `POST /auth/logout` | Sin cuerpo; autenticado | 200: `mensaje`; revoca el token utilizado. |
-| `POST /auth/recuperacion/solicitar` | `email` | 200: `mensaje` genérico. |
-| `POST /auth/recuperacion/verificar` | `email`, `codigo` como cadena de seis dígitos | 200: `mensaje`, `token_recuperacion`. |
-| `POST /auth/recuperacion/restablecer` | `token_recuperacion`, `password`, `password_confirmation` | 200: `mensaje`; exige nuevo login. |
+| Método y ruta                         | Entrada                                                   | Éxito                                                       |
+| ------------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------- |
+| `POST /auth/registro`                 | `name`, `email`, `password`, `password_confirmation`      | 201: `mensaje`, `usuario`.                                  |
+| `POST /auth/login`                    | `email`, `password`; `dispositivo` opcional               | 200: `mensaje`, `token`, `token_type: "Bearer"`, `usuario`. |
+| `POST /auth/logout`                   | Sin cuerpo; autenticado                                   | 200: `mensaje`; revoca el token utilizado.                  |
+| `POST /auth/recuperacion/solicitar`   | `email`                                                   | 200: `mensaje` genérico.                                    |
+| `POST /auth/recuperacion/verificar`   | `email`, `codigo` como cadena de seis dígitos             | 200: `mensaje`, `token_recuperacion`.                       |
+| `POST /auth/recuperacion/restablecer` | `token_recuperacion`, `password`, `password_confirmation` | 200: `mensaje`; exige nuevo login.                          |
 
 El registro crea una cuenta activa con rol `usuario` desde el servidor y no inicia sesión. Nombre y correo admiten hasta 255 caracteres; las contraseñas nuevas requieren al menos 12 caracteres y confirmación. `dispositivo` admite hasta 255 caracteres.
 
@@ -67,24 +67,24 @@ La verificación de propiedad del correo en registro o cambio de correo no está
 
 Todas estas rutas requieren autenticación y cuenta activa.
 
-| Método y ruta | Entrada | Respuesta 200 |
-| --- | --- | --- |
-| `GET /perfil` | — | `data` con el recurso de usuario. |
-| `PATCH /perfil` | `name` y/o `email`; `current_password` obligatorio si cambia el correo | `mensaje`, `usuario`. |
-| `POST /perfil/foto` | Archivo `foto_perfil` | `mensaje`, `foto_perfil_url`. |
-| `PUT /perfil/password` | `current_password`, `password`, `password_confirmation` | `mensaje`; revoca también el token que realizó la petición. |
+| Método y ruta          | Entrada                                                                | Respuesta 200                                               |
+| ---------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `GET /perfil`          | —                                                                      | `data` con el recurso de usuario.                           |
+| `PATCH /perfil`        | `name` y/o `email`; `current_password` obligatorio si cambia el correo | `mensaje`, `usuario`.                                       |
+| `POST /perfil/foto`    | Archivo `foto_perfil`                                                  | `mensaje`, `foto_perfil_url`.                               |
+| `PUT /perfil/password` | `current_password`, `password`, `password_confirmation`                | `mensaje`; revoca también el token que realizó la petición. |
 
 La contraseña nueva debe ser diferente de la actual. La foto admite JPEG/JPG, PNG o WEBP y hasta 2048 KiB. Existe además `GET /api/user`, fuera del prefijo v1, como consulta protegida anterior que devuelve el mismo perfil en `data`.
 
 ## 4. Catálogo público y paginación
 
-| Método y ruta | Parámetros | Respuesta |
-| --- | --- | --- |
-| `GET /categorias` | — | 200: `data` con `{id, nombre}`; sin paginación, ordenado por nombre e ID. |
-| `GET /ingredientes` | `buscar`, `page`, `per_page` | 200: colección paginada de `{id, nombre}`. |
-| `GET /recetas` | `buscar`, `categoria_id`, `ingredientes[]`, `page`, `per_page` | 200: catálogo paginado. |
-| `GET /recetas/{receta}` | ID canónico | 200: detalle en `data`. |
-| `GET /recetas/{receta}/imagen` | ID canónico | 200: archivo; 404 si la receta o su imagen no están disponibles. |
+| Método y ruta                  | Parámetros                                                     | Respuesta                                                                 |
+| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `GET /categorias`              | —                                                              | 200: `data` con `{id, nombre}`; sin paginación, ordenado por nombre e ID. |
+| `GET /ingredientes`            | `buscar`, `page`, `per_page`                                   | 200: colección paginada de `{id, nombre}`.                                |
+| `GET /recetas`                 | `buscar`, `categoria_id`, `ingredientes[]`, `page`, `per_page` | 200: catálogo paginado.                                                   |
+| `GET /recetas/{receta}`        | ID canónico                                                    | 200: detalle en `data`.                                                   |
+| `GET /recetas/{receta}/imagen` | ID canónico                                                    | 200: archivo; 404 si la receta o su imagen no están disponibles.          |
 
 El catálogo contiene únicamente recetas publicadas y no eliminadas. Mantiene visibles las publicaciones de autores deshabilitados. Las recetas privadas ajenas, eliminadas e inexistentes no se distinguen mediante la consulta pública de detalle.
 
@@ -110,17 +110,17 @@ El detalle añade `tips` nullable, `ingredientes` y `pasos`. Un ingrediente cont
 
 Todas estas rutas requieren autenticación y propiedad. Un administrador no obtiene acceso a recetas privadas ajenas mediante `mis-recetas`. En estas rutas propias se conserva el comportamiento 403 para recursos existentes de otra cuenta; un ID inexistente devuelve 404.
 
-| Método y ruta | Entrada | Éxito |
-| --- | --- | --- |
-| `GET /mis-recetas` | `filtro`: `todas`, `privadas`, `publicadas`, `eliminadas`; `buscar`, `page`, `per_page` | 200: colección paginada propia. |
-| `POST /mis-recetas` | Receta completa y archivo `imagen` | 201: detalle propio en `data`, privada, versión 1. |
-| `GET /mis-recetas/{receta}` | — | 200: detalle propio en `data`. |
-| `PUT`, `PATCH` o `POST /mis-recetas/{receta}` | Receta completa, `version`; imagen opcional | 200: detalle actualizado en `data`. |
-| `DELETE /mis-recetas/{receta}` | — | 200: `mensaje`, `receta` con metadatos de eliminación. |
-| `GET /mis-recetas/{receta}/imagen` | — | 200: imagen vigente del autor. |
-| `POST /mis-recetas/{receta}/imagen` | Archivo `imagen` | 200: `mensaje`, `imagen`, `imagen_url`. |
-| `POST /mis-recetas/{receta}/publicar` | `clave_idempotencia` UUID | 200 publicación administrativa directa; 201 nuevo envío a revisión. |
-| `POST /mis-recetas/{receta}/corregir` | `clave_idempotencia`, `version_base`, `contenido` | 201: `mensaje`, `solicitud` pendiente, también para administradores. |
+| Método y ruta                                 | Entrada                                                                                 | Éxito                                                                |
+| --------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `GET /mis-recetas`                            | `filtro`: `todas`, `privadas`, `publicadas`, `eliminadas`; `buscar`, `page`, `per_page` | 200: colección paginada propia.                                      |
+| `POST /mis-recetas`                           | Receta completa y archivo `imagen`                                                      | 201: detalle propio en `data`, privada, versión 1.                   |
+| `GET /mis-recetas/{receta}`                   | —                                                                                       | 200: detalle propio en `data`.                                       |
+| `PUT`, `PATCH` o `POST /mis-recetas/{receta}` | Receta completa, `version`; imagen opcional                                             | 200: detalle actualizado en `data`.                                  |
+| `DELETE /mis-recetas/{receta}`                | —                                                                                       | 200: `mensaje`, `receta` con metadatos de eliminación.               |
+| `GET /mis-recetas/{receta}/imagen`            | —                                                                                       | 200: imagen vigente del autor.                                       |
+| `POST /mis-recetas/{receta}/imagen`           | Archivo `imagen`                                                                        | 200: `mensaje`, `imagen`, `imagen_url`.                              |
+| `POST /mis-recetas/{receta}/publicar`         | `clave_idempotencia` UUID                                                               | 200 publicación administrativa directa; 201 nuevo envío a revisión.  |
+| `POST /mis-recetas/{receta}/corregir`         | `clave_idempotencia`, `version_base`, `contenido`                                       | 201: `mensaje`, `solicitud` pendiente, también para administradores. |
 
 Las tres variantes de actualización de receta privada exigen el contenido completo aunque se use PATCH. Una versión desactualizada produce 409. No se puede actualizar por esta vía una receta publicada, eliminada o con envío pendiente. Para editar una privada enviada debe cancelarse primero la solicitud. Las publicadas no pueden volver a privadas.
 
@@ -134,33 +134,37 @@ Ejemplo del objeto de contenido. Para crear una receta, enviar estos campos al n
 
 ```json
 {
-  "nombre": "Arroz con verduras",
-  "descripcion": "Arroz casero con verduras frescas.",
-  "porciones": 2,
-  "tiempo_preparacion": 25,
-  "tips": null,
-  "categorias": [1],
-  "ingredientes": [
-    {"ingrediente_id": 1, "cantidad": 2, "unidad": "tazas", "notas": null, "orden": 1}
-  ],
-  "pasos": [
-    {"orden": 1, "instruccion": "Cocinar el arroz."}
-  ]
+    "nombre": "Arroz con verduras",
+    "descripcion": "Arroz casero con verduras frescas.",
+    "porciones": 2,
+    "tiempo_preparacion": 25,
+    "tips": null,
+    "categorias": [1],
+    "ingredientes": [
+        {
+            "ingrediente_id": 1,
+            "cantidad": 2,
+            "unidad": "tazas",
+            "notas": null,
+            "orden": 1
+        }
+    ],
+    "pasos": [{ "orden": 1, "instruccion": "Cocinar el arroz." }]
 }
 ```
 
-| Campo | Regla |
-| --- | --- |
-| `nombre` | Obligatorio, texto, hasta 150 caracteres. |
-| `descripcion` | Obligatoria, texto, hasta 16000 caracteres. |
-| `porciones`, `tiempo_preparacion` | Enteros entre 1 y 65535. |
-| `tips` | Opcional/nullable, hasta 16000 caracteres. |
-| `categorias` | Lista de 1 a 100 IDs existentes y distintos. |
-| `ingredientes` | Lista de 1 a 500 objetos; IDs existentes sin repetir. |
-| `cantidad` | Campo presente, nullable; si contiene número, mayor que cero, hasta 9999999.999 y tres decimales. |
-| `unidad`, `notas` | Campos presentes y nullables; hasta 50 y 16000 caracteres, respectivamente. |
-| `orden` | Entero entre 1 y 65535, distinto dentro de cada lista. |
-| `pasos` | Lista de 1 a 500 objetos; instrucción obligatoria de hasta 16000 caracteres. |
+| Campo                             | Regla                                                                                             |
+| --------------------------------- | ------------------------------------------------------------------------------------------------- |
+| `nombre`                          | Obligatorio, texto, hasta 150 caracteres.                                                         |
+| `descripcion`                     | Obligatoria, texto, hasta 16000 caracteres.                                                       |
+| `porciones`, `tiempo_preparacion` | Enteros entre 1 y 65535.                                                                          |
+| `tips`                            | Opcional/nullable, hasta 16000 caracteres.                                                        |
+| `categorias`                      | Lista de 1 a 100 IDs existentes y distintos.                                                      |
+| `ingredientes`                    | Lista de 1 a 500 objetos; IDs existentes sin repetir.                                             |
+| `cantidad`                        | Campo presente, nullable; si contiene número, mayor que cero, hasta 9999999.999 y tres decimales. |
+| `unidad`, `notas`                 | Campos presentes y nullables; hasta 50 y 16000 caracteres, respectivamente.                       |
+| `orden`                           | Entero entre 1 y 65535, distinto dentro de cada lista.                                            |
+| `pasos`                           | Lista de 1 a 500 objetos; instrucción obligatoria de hasta 16000 caracteres.                      |
 
 Las listas deben tener índices consecutivos desde cero. La corrección admite solamente los campos documentados en `contenido`; los objetos de ingredientes y pasos también tienen campos cerrados. En formularios multipart, `categorias`, `ingredientes` y `pasos` pueden enviarse como cadenas JSON. `contenido` también puede ser una cadena JSON válida en la corrección.
 
@@ -181,7 +185,7 @@ Un usuario normal solicita publicación y espera revisión. La publicación inic
 Ejemplo de publicación:
 
 ```json
-{"clave_idempotencia": "ea868f67-c714-4896-9752-b038ff585971"}
+{ "clave_idempotencia": "ea868f67-c714-4896-9752-b038ff585971" }
 ```
 
 Para corregir se añade `version_base` con la versión consultada y `contenido` con el objeto anterior. El primer envío devuelve 201 con `mensaje` y `solicitud`. Si la versión ya cambió y la clave no identifica una operación completada idéntica, devuelve 422 en `version_base`.
@@ -203,12 +207,12 @@ La creación de una receta privada y las subidas de archivo no ofrecen idempoten
 
 ## 7. Solicitudes propias y revisión web
 
-| Método y ruta API | Entrada | Respuesta 200 |
-| --- | --- | --- |
-| `GET /mis-solicitudes` | `estado`: `todos`, `pendiente`, `aprobada`, `rechazada`, `cancelada`; `tipo`: `todos`, `publicacion`, `correccion`; paginación | Colección propia. |
-| `GET /mis-solicitudes/{solicitud}` | — | Detalle en `data`. |
-| `GET /mis-solicitudes/{solicitud}/imagen` | — | Imagen propuesta autorizada. |
-| `POST /mis-solicitudes/{solicitud}/cancelar` | Sin cuerpo | `mensaje`, `solicitud`. |
+| Método y ruta API                            | Entrada                                                                                                                        | Respuesta 200                |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ---------------------------- |
+| `GET /mis-solicitudes`                       | `estado`: `todos`, `pendiente`, `aprobada`, `rechazada`, `cancelada`; `tipo`: `todos`, `publicacion`, `correccion`; paginación | Colección propia.            |
+| `GET /mis-solicitudes/{solicitud}`           | —                                                                                                                              | Detalle en `data`.           |
+| `GET /mis-solicitudes/{solicitud}/imagen`    | —                                                                                                                              | Imagen propuesta autorizada. |
+| `POST /mis-solicitudes/{solicitud}/cancelar` | Sin cuerpo                                                                                                                     | `mensaje`, `solicitud`.      |
 
 El resumen contiene `id`, `receta_id`, `receta_nombre`, `tipo`, `estado`, `version_base`, `clave_idempotencia`, `created_at`, `revisada_en`, `cancelada_en` y `motivo_rechazo`. El detalle añade `contenido`, con categorías e ingredientes enriquecidos con nombres y la URL autenticada de imagen. No expone datos privados del revisor.
 
@@ -226,14 +230,14 @@ La clasificación de corrección menor es manual: el administrador verifica que 
 
 Los favoritos remotos requieren cuenta. Los invitados podrán guardar copias locales en la futura app, pero el backend no almacena ni sincroniza una lista de favoritos anónimos.
 
-| Método y ruta | Acceso | Resultado |
-| --- | --- | --- |
-| `GET /favoritos` | Autenticado | 200, colección paginada propia, incluidas entradas eliminadas. |
-| `POST /favoritos/{receta}` | Autenticado | 201: `mensaje`, `receta_id`, `es_favorito: true`; no duplica la relación. |
-| `DELETE /favoritos/{receta}` | Autenticado | 200: `mensaje`, `es_favorito: false`; también funciona si ya no estaba o fue eliminada. |
-| `GET /favoritos/{receta}/estado` | Autenticado | 200: `receta_id`, `es_favorito`; no confirma eliminación. |
-| `POST /favoritos/verificar-disponibilidad` | Autenticado | 200: comprobación por lote del estado público. |
-| `POST /recetas/verificar-disponibilidad` | Público | 200: el mismo contrato de disponibilidad pública, para invitados. |
+| Método y ruta                              | Acceso      | Resultado                                                                               |
+| ------------------------------------------ | ----------- | --------------------------------------------------------------------------------------- |
+| `GET /favoritos`                           | Autenticado | 200, colección paginada propia, incluidas entradas eliminadas.                          |
+| `POST /favoritos/{receta}`                 | Autenticado | 201: `mensaje`, `receta_id`, `es_favorito: true`; no duplica la relación.               |
+| `DELETE /favoritos/{receta}`               | Autenticado | 200: `mensaje`, `es_favorito: false`; también funciona si ya no estaba o fue eliminada. |
+| `GET /favoritos/{receta}/estado`           | Autenticado | 200: `receta_id`, `es_favorito`; no confirma eliminación.                               |
+| `POST /favoritos/verificar-disponibilidad` | Autenticado | 200: comprobación por lote del estado público.                                          |
+| `POST /recetas/verificar-disponibilidad`   | Público     | 200: el mismo contrato de disponibilidad pública, para invitados.                       |
 
 Solo se agregan recetas publicadas y vigentes. Consultar `/favoritos/{id}/estado` para una privada ajena o un ID inexistente devuelve el mismo 404, sin revelar su existencia. La consulta puede reconocer la receta privada propia, pero eso no autoriza agregarla como favorito público.
 
@@ -246,19 +250,27 @@ POST /api/v1/recetas/verificar-disponibilidad
 ```
 
 ```json
-{"ids": [12, 18, 25, 99]}
+{ "ids": [12, 18, 25, 99] }
 ```
 
 Se admiten de 1 a 50 IDs canónicos distintos. Una respuesta ilustrativa es:
 
 ```json
 {
-  "data": [
-    {"id": 12, "estado": "disponible"},
-    {"id": 18, "estado": "eliminada_autor", "mensaje": "Esta receta fue eliminada por su autor"},
-    {"id": 25, "estado": "eliminada_administracion", "mensaje": "Esta receta fue eliminada"},
-    {"id": 99, "estado": "no_disponible"}
-  ]
+    "data": [
+        { "id": 12, "estado": "disponible" },
+        {
+            "id": 18,
+            "estado": "eliminada_autor",
+            "mensaje": "Esta receta fue eliminada por su autor"
+        },
+        {
+            "id": 25,
+            "estado": "eliminada_administracion",
+            "mensaje": "Esta receta fue eliminada"
+        },
+        { "id": 99, "estado": "no_disponible" }
+    ]
 }
 ```
 
@@ -283,16 +295,16 @@ La retirada administrativa y sus efectos todavía requieren completar el flujo f
 
 Valores predeterminados observados en `config/api.php` y `AppServiceProvider`. Los límites configurables pueden ajustarse mediante las variables indicadas; no son una cuota contratada para todo despliegue.
 
-| Operación | Límite y ámbito | Configuración |
-| --- | --- | --- |
-| Registro | 5/minuto y 20/hora por IP | `API_REGISTRO_POR_MINUTO`, `API_REGISTRO_POR_HORA` |
-| Login | 5/minuto por correo y 10/minuto por IP; cuentan las peticiones | Definido en el provider |
-| Solicitar recuperación | 1/minuto y 5/hora por correo; 15/hora por IP | Definido en el provider |
-| Verificar código | 10/minuto por IP; además límite de intentos del código | Definido en el provider |
-| Restablecer contraseña | 10/minuto por IP | `API_RESTABLECER_POR_MINUTO` |
-| Disponibilidad pública | 30/minuto por IP | `API_DISPONIBILIDAD_POR_MINUTO` |
-| Escrituras autenticadas | 60/minuto por cuenta, compartidas entre esas rutas | `API_ESCRITURAS_POR_MINUTO` |
-| Subidas de imágenes | 10/minuto por cuenta cuando hay archivo; se suma al límite de escrituras | `API_IMAGENES_POR_MINUTO` |
+| Operación               | Límite y ámbito                                                          | Configuración                                      |
+| ----------------------- | ------------------------------------------------------------------------ | -------------------------------------------------- |
+| Registro                | 5/minuto y 20/hora por IP                                                | `API_REGISTRO_POR_MINUTO`, `API_REGISTRO_POR_HORA` |
+| Login                   | 5/minuto por correo y 10/minuto por IP; cuentan las peticiones           | Definido en el provider                            |
+| Solicitar recuperación  | 1/minuto y 5/hora por correo; 15/hora por IP                             | Definido en el provider                            |
+| Verificar código        | 10/minuto por IP; además límite de intentos del código                   | Definido en el provider                            |
+| Restablecer contraseña  | 10/minuto por IP                                                         | `API_RESTABLECER_POR_MINUTO`                       |
+| Disponibilidad pública  | 30/minuto por IP                                                         | `API_DISPONIBILIDAD_POR_MINUTO`                    |
+| Escrituras autenticadas | 60/minuto por cuenta, compartidas entre esas rutas                       | `API_ESCRITURAS_POR_MINUTO`                        |
+| Subidas de imágenes     | 10/minuto por cuenta cuando hay archivo; se suma al límite de escrituras | `API_IMAGENES_POR_MINUTO`                          |
 
 El límite de imágenes también cubre crear y actualizar recetas cuando la petición contiene un archivo `imagen` o `foto_perfil`. Las consultas GET/HEAD/OPTIONS y el cierre de sesión no consumen la cuota de escrituras. Una actualización de texto sin archivo no consume la cuota de imágenes. La ruta autenticada de disponibilidad usa la cuota de escrituras. No interpretar estos límites como protección global de todos los endpoints públicos.
 

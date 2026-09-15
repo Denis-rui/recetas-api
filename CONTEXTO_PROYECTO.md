@@ -1,4 +1,4 @@
-# ¿Qué Cocinamos? — Contexto del proyecto
+# ¿Qué Preparamos? — Contexto del proyecto
 
 Este documento reúne el contexto funcional, técnico y organizativo compartido por el equipo. Su finalidad es permitir que otro integrante o asistente de IA continúe el proyecto sin depender del historial de una conversación.
 
@@ -15,7 +15,7 @@ Este documento reúne el contexto funcional, técnico y organizativo compartido 
 
 ## 2. Identidad y propósito
 
-**Nombre:** ¿Qué Cocinamos?
+**Nombre:** ¿Qué Preparamos?
 
 Aplicación móvil para organizar y consultar recetas de comidas, bebidas, cócteles y postres. Ayudará a decidir qué preparar a partir de los ingredientes disponibles, mostrando cuáles se tienen y cuáles hacen falta.
 

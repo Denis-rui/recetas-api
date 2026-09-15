@@ -64,7 +64,7 @@
                        id="email" 
                        value="{{ old('email') }}" 
                        required 
-                       placeholder="ejemplo@quecocinamos.com"
+                       placeholder="ejemplo@quepreparamos.com"
                        class="w-full rounded-lg border border-slate-300 px-3.5 py-2 text-sm text-slate-900 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 focus:outline-hidden transition">
                 <p class="text-xs text-slate-400 mt-1">Debe ser único. Se utilizará para iniciar sesión.</p>
             </div>

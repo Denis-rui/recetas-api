@@ -100,7 +100,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>¿Qué Cocinamos?</h1>
+            <h1>¿Qué Preparamos?</h1>
         </div>
         <div class="content">
             <p class="greeting">Hola,</p>
@@ -123,7 +123,7 @@
             </div>
         </div>
         <div class="footer">
-            &copy; {{ date('Y') }} ¿Qué Cocinamos?. Todos los derechos reservados.
+            &copy; {{ date('Y') }} ¿Qué Preparamos?. Todos los derechos reservados.
         </div>
     </div>
 </body>

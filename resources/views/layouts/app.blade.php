@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
-    <title>@yield('titulo', 'Panel Administrativo') - ¿Qué Cocinamos?</title>
+    <title>@yield('titulo', 'Panel Administrativo') - ¿Qué Preparamos?</title>
 
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600,700" rel="stylesheet" />
@@ -61,7 +61,7 @@
                     </defs>
                     </svg>
                 <div>
-                    <span class="font-bold text-slate-900 text-base tracking-tight block leading-tight">¿Qué Cocinamos?</span>
+                    <span class="font-bold text-slate-900 text-base tracking-tight block leading-tight">¿Qué Preparamos?</span>
                     <span class="text-xs text-amber-600 font-medium tracking-wide">Panel Web</span>
                 </div>
             </a>
@@ -155,7 +155,7 @@
         <!-- Pie de Página -->
         <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500 shrink-0">
             <div class="max-w-6xl mx-auto px-4">
-                &copy; {{ date('Y') }} ¿Qué Cocinamos? &bull; Panel Administrativo
+                &copy; {{ date('Y') }} ¿Qué Preparamos? &bull; Panel Administrativo
             </div>
         </footer>
     </div>
