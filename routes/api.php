@@ -58,7 +58,8 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::prefix('perfil')->name('perfil.')->group(function () {
             Route::get('/', [PerfilController::class, 'show'])->name('show');
             Route::patch('/', [PerfilController::class, 'update'])->name('update');
-            Route::post('/foto', [PerfilController::class, 'actualizarFoto'])->middleware('throttle:api-imagenes')->name('foto');
+            Route::get('/foto', [PerfilController::class, 'foto'])->name('foto');
+            Route::post('/foto', [PerfilController::class, 'actualizarFoto'])->middleware('throttle:api-imagenes')->name('foto.subir');
             Route::put('/password', [PerfilController::class, 'cambiarPassword'])->name('password');
         });
 

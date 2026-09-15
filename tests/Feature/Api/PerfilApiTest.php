@@ -144,7 +144,33 @@ test('subida exitosa de fotografia devuelve url publica absoluta y limpia imagen
         ->and(Storage::disk('public')->exists($this->usuario->foto_perfil))->toBeTrue()
         ->and(Storage::disk('public')->exists('perfiles/antigua.jpg'))->toBeFalse();
 
-    expect($response->json('foto_perfil_url'))->toContain('http');
+    expect($response->json('foto_perfil_url'))->toContain('http')
+        ->and($response->json('foto_perfil_url'))->toContain('/api/v1/perfil/foto');
+});
+
+test('descarga de fotografia de perfil sirve archivo de forma autenticada', function () {
+    $foto = UploadedFile::fake()->create('avatar.png', 100, 'image/png');
+    $ruta = Storage::disk('public')->putFile('perfiles', $foto);
+    $this->usuario->update(['foto_perfil' => $ruta]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->get('/api/v1/perfil/foto');
+
+    $response->assertOk();
+    expect($response->headers->get('content-type'))->toContain('image/png');
+});
+
+test('descarga de foto de perfil devuelve 404 si la cuenta no tiene foto asignada', function () {
+    $this->usuario->update(['foto_perfil' => null]);
+
+    $response = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->getJson('/api/v1/perfil/foto');
+
+    $response->assertNotFound();
+});
+
+test('descarga de foto de perfil requiere autenticacion activa', function () {
+    $this->getJson('/api/v1/perfil/foto')->assertUnauthorized();
 });
 
 test('subida de foto rechaza formatos no permitidos y tamano mayor a 2mb', function () {

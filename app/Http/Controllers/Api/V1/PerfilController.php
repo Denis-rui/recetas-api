@@ -11,6 +11,8 @@ use App\Http\Requests\Api\V1\Perfil\CambiarPasswordApiRequest;
 use App\Http\Resources\Api\V1\PerfilResource;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\Response;
 
 class PerfilController extends Controller
@@ -41,6 +43,28 @@ class PerfilController extends Controller
             'mensaje' => 'Perfil actualizado exitosamente.',
             'usuario' => new PerfilResource($usuario),
         ], Response::HTTP_OK);
+    }
+
+    /**
+     * Sirve de forma autenticada la fotografía de perfil de la cuenta activa.
+     */
+    public function foto(Request $request): BinaryFileResponse
+    {
+        $usuario = $request->user();
+
+        if (! $usuario->foto_perfil || ! Storage::disk('public')->exists($usuario->foto_perfil)) {
+            abort(404, 'Fotografía de perfil no encontrada.');
+        }
+
+        $rutaAbsoluta = Storage::disk('public')->path($usuario->foto_perfil);
+        $mime = Storage::disk('public')->mimeType($usuario->foto_perfil) ?? 'image/jpeg';
+
+        return response()->file($rutaAbsoluta, [
+            'Content-Type' => $mime,
+            'Cache-Control' => 'no-store, private',
+            'X-Content-Type-Options' => 'nosniff',
+            'Content-Security-Policy' => "default-src 'none'; sandbox",
+        ])->setPrivate();
     }
 
     /**

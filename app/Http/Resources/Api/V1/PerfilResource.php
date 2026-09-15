@@ -5,7 +5,6 @@ namespace App\Http\Resources\Api\V1;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
-use Illuminate\Support\Facades\Storage;
 
 /**
  * @mixin User
@@ -23,7 +22,7 @@ class PerfilResource extends JsonResource
             'id' => $this->id,
             'name' => $this->name,
             'email' => $this->email,
-            'foto_perfil_url' => $this->foto_perfil ? Storage::disk('public')->url($this->foto_perfil) : null,
+            'foto_perfil_url' => $this->foto_perfil ? route('api.v1.perfil.foto') : null,
             'rol' => $this->rol,
             'activo' => (bool) $this->activo,
         ];

@@ -71,6 +71,7 @@ Todas estas rutas requieren autenticación y cuenta activa.
 | ---------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
 | `GET /perfil`          | —                                                                      | `data` con el recurso de usuario.                           |
 | `PATCH /perfil`        | `name` y/o `email`; `current_password` obligatorio si cambia el correo | `mensaje`, `usuario`.                                       |
+| `GET /perfil/foto`     | —                                                                      | 200: archivo de imagen; 404 si la cuenta no tiene foto.     |
 | `POST /perfil/foto`    | Archivo `foto_perfil`                                                  | `mensaje`, `foto_perfil_url`.                               |
 | `PUT /perfil/password` | `current_password`, `password`, `password_confirmation`                | `mensaje`; revoca también el token que realizó la petición. |
 

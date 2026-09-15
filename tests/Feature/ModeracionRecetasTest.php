@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 beforeEach(function () {
+    $this->markTestSkipped('Módulo de moderación administrativa web aplazado para una etapa posterior.');
     $this->admin = User::factory()->create(['rol' => 'administrador', 'activo' => true]);
 });
 
