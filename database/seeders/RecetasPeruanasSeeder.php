@@ -9,6 +9,10 @@ use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Encoders\WebpEncoder;
+use Intervention\Image\ImageManager;
 
 class RecetasPeruanasSeeder extends Seeder
 {
@@ -376,22 +380,40 @@ class RecetasPeruanasSeeder extends Seeder
             foreach ($recetas as $index => $datos) {
                 $categoria = Categoria::firstOrCreate(['nombre' => $datos['categoria']]);
 
-                $receta = Receta::create([
-                    'nombre' => $datos['nombre'],
-                    'descripcion' => $datos['descripcion'],
-                    'porciones' => $datos['porciones'],
-                    'tiempo_preparacion' => $datos['tiempo_preparacion'],
-                    'tips' => $datos['tips'],
-                    'imagen' => 'temporal.png', // Temporary value to pass validation
-                    'creado_por' => $admin->id,
-                    'publicada_en' => now(),
-                ]);
-
-                $imagenRuta = 'recetas/'.$receta->id.'/portada.png';
-                Storage::disk('local')->put(
-                    $imagenRuta,
-                    base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII=')
+                $receta = Receta::updateOrCreate(
+                    ['nombre' => $datos['nombre']],
+                    [
+                        'descripcion' => $datos['descripcion'],
+                        'porciones' => $datos['porciones'],
+                        'tiempo_preparacion' => $datos['tiempo_preparacion'],
+                        'tips' => $datos['tips'],
+                        'imagen' => 'temporal.png', // Temporary value to pass validation
+                        'creado_por' => $admin->id,
+                        'publicada_en' => now(),
+                    ]
                 );
+
+                $nombreBase = Str::slug($datos['nombre']);
+                $rutaOrigenBusqueda = database_path('seeders/imagenes/'.$nombreBase.'.*');
+                $archivosEncontrados = glob($rutaOrigenBusqueda);
+                $rutaOrigen = ! empty($archivosEncontrados) ? $archivosEncontrados[0] : null;
+
+                $imagenRuta = 'recetas/'.$receta->id.'/portada.webp';
+
+                if ($rutaOrigen && file_exists($rutaOrigen)) {
+                    $manager = new ImageManager(new Driver);
+                    $imagenOptimizada = $manager->decode($rutaOrigen)
+                        ->scaleDown(1024, 1024)
+                        ->encode(new WebpEncoder(quality: 80));
+
+                    Storage::disk('local')->put($imagenRuta, $imagenOptimizada->toString());
+                } else {
+                    // Fallback a imagen en blanco
+                    Storage::disk('local')->put(
+                        $imagenRuta,
+                        base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII=')
+                    );
+                }
                 $receta->update(['imagen' => $imagenRuta]);
 
                 $receta->categorias()->attach($categoria->id);
