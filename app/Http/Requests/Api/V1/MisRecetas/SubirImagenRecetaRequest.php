@@ -35,4 +35,3 @@ class SubirImagenRecetaRequest extends FormRequest
         ];
     }
 }
-

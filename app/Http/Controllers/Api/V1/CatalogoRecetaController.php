@@ -75,6 +75,27 @@ class CatalogoRecetaController extends Controller
         return RecetaCatalogoResource::collection($recetas);
     }
 
+    public function aleatorias(): AnonymousResourceCollection
+    {
+        $recetas = Receta::query()
+            ->publicada()
+            ->withAvg('valoraciones as valoracion_promedio', 'puntuacion')
+            ->withCount('valoraciones as cantidad_valoraciones')
+            ->withCount('ingredientes as cantidad_ingredientes')
+            ->with([
+                'categorias:id,nombre',
+                'ingredientes' => fn ($subQuery) => $subQuery
+                    ->select('ingredientes.id', 'ingredientes.nombre')
+                    ->withPivot(['orden'])
+                    ->orderByPivot('orden'),
+            ])
+            ->inRandomOrder()
+            ->limit(10)
+            ->get();
+
+        return RecetaCatalogoResource::collection($recetas);
+    }
+
     public function show(mixed $receta): RecetaDetalleResource
     {
         if (! IdentificadorEntero::esValido($receta)) {

@@ -628,3 +628,18 @@ test('autenticacion como autor o administrador no amplia la visibilidad publica'
     $this->actingAs($autor)->get("/api/v1/recetas/{$recetaPrivada->id}/imagen")
         ->assertStatus(404);
 });
+
+test('endpoint de recetas aleatorias devuelve 10 o menos recetas publicadas', function () {
+    // Crear 15 recetas publicadas
+    Receta::factory()->publicada()->count(15)->create();
+
+    // Crear 5 recetas privadas
+    Receta::factory()->count(5)->create();
+
+    $resp = $this->getJson('/api/v1/recetas/aleatorias');
+    $resp->assertStatus(200);
+
+    // Debe devolver exactamente 10 recetas (el límite)
+    $data = $resp->json('data');
+    expect($data)->toHaveCount(10);
+});

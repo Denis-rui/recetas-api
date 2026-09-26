@@ -22,4 +22,3 @@ class MiValoracionResource extends JsonResource
         ];
     }
 }
-

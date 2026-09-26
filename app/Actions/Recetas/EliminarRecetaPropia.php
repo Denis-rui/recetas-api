@@ -67,4 +67,3 @@ class EliminarRecetaPropia
         }, attempts: 3);
     }
 }
-
