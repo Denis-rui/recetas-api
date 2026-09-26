@@ -416,18 +416,21 @@ class RecetasPeruanasSeeder extends Seeder
                 }
                 $receta->update(['imagen' => $imagenRuta]);
 
-                $receta->categorias()->attach($categoria->id);
+                $receta->categorias()->sync([$categoria->id]);
 
+                $ingredientesSync = [];
                 foreach ($datos['ingredientes'] as $orden => $ing) {
                     $ingredienteModel = Ingrediente::firstOrCreate(['nombre' => $ing['nombre']]);
-                    $receta->ingredientes()->attach($ingredienteModel->id, [
+                    $ingredientesSync[$ingredienteModel->id] = [
                         'cantidad' => $ing['cantidad'],
                         'unidad' => $ing['unidad'],
                         'notas' => $ing['notas'],
                         'orden' => $orden + 1,
-                    ]);
+                    ];
                 }
+                $receta->ingredientes()->sync($ingredientesSync);
 
+                $receta->pasos()->delete();
                 foreach ($datos['pasos'] as $orden => $instruccion) {
                     $receta->pasos()->create([
                         'orden' => $orden + 1,
