@@ -7,6 +7,9 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Intervention\Image\Drivers\Gd\Driver;
+use Intervention\Image\Encoders\WebpEncoder;
+use Intervention\Image\ImageManager;
 
 class GuardarImagenReceta
 {
@@ -50,11 +53,32 @@ class GuardarImagenReceta
             ]);
         }
 
-        $nombreArchivo = Str::random(40).'.'.$extension;
+        // --- NUEVA LÓGICA DE CONVERSIÓN CON INTERVENTION v4 ---
+        $nombreArchivo = Str::random(40).'.webp';
         $directorio = 'recetas/'.$recetaId;
-        $rutaAlmacenada = $archivo->storeAs($directorio, $nombreArchivo, 'local');
+        $rutaAlmacenada = $directorio.'/'.$nombreArchivo;
 
-        if (! $rutaAlmacenada || ! Storage::disk('local')->exists($rutaAlmacenada)) {
+        try {
+            $manager = new ImageManager(new Driver);
+            $imagen = $manager->decode($rutaReal);
+
+            // Redimensionar respetando el aspecto, máximo 1024 de ancho o alto
+            $imagen->scaleDown(1024, 1024);
+
+            // Codificamos la imagen a WebP con calidad del 80%
+            $imagenOptimizada = $imagen->encode(new WebpEncoder(quality: 80));
+
+            // Guardamos en el disco de Laravel
+            Storage::disk('local')->put($rutaAlmacenada, $imagenOptimizada->toString());
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error optimizando imagen: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            throw ValidationException::withMessages([
+                'imagen' => 'Ocurrió un error al procesar y optimizar la imagen.',
+            ]);
+        }
+
+        if (! Storage::disk('local')->exists($rutaAlmacenada)) {
             throw ValidationException::withMessages([
                 'imagen' => 'No se pudo guardar la imagen en el almacenamiento del servidor.',
             ]);
@@ -62,7 +86,7 @@ class GuardarImagenReceta
 
         return [
             'ruta' => $rutaAlmacenada,
-            'mime' => $mimeReal,
+            'mime' => 'image/webp',
         ];
     }
 
