@@ -57,4 +57,3 @@ class FavoritoResource extends JsonResource
         ];
     }
 }
-

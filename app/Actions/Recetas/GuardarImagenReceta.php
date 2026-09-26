@@ -11,6 +11,7 @@ use Illuminate\Validation\ValidationException;
 class GuardarImagenReceta
 {
     private const FORMATOS_VALIDOS = ['jpg', 'jpeg', 'png', 'webp'];
+
     private const MIMES_VALIDOS = ['image/jpeg', 'image/png', 'image/webp'];
 
     /**
@@ -79,4 +80,3 @@ class GuardarImagenReceta
         }
     }
 }
-

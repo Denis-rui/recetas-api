@@ -25,6 +25,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // Catálogo público accesible sin autenticación
     Route::get('/categorias', [CatalogoCategoriaController::class, 'index'])->name('categorias.index');
     Route::get('/ingredientes', [CatalogoIngredienteController::class, 'index'])->name('ingredientes.index');
+    Route::get('/recetas/aleatorias', [CatalogoRecetaController::class, 'aleatorias'])->name('recetas.aleatorias');
     Route::get('/recetas', [CatalogoRecetaController::class, 'index'])->name('recetas.index');
     Route::post('/recetas/verificar-disponibilidad', [FavoritoController::class, 'verificarDisponibilidad'])
         ->middleware('throttle:api-disponibilidad')->name('recetas.verificar-disponibilidad');

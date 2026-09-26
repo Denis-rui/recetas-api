@@ -85,4 +85,3 @@ class RecetaPolicy
             && ! $receta->trashed();
     }
 }
-
