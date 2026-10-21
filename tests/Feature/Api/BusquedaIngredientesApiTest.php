@@ -4,6 +4,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -82,19 +83,33 @@ test('combina ingredientes nombre literal y categoria mediante todos los filtros
     $arroz = Ingrediente::factory()->create();
     $pollo = Ingrediente::factory()->create();
     $comidas = Categoria::factory()->create();
+    $subComidas = Subcategoria::factory()->create(['categoria_id' => $comidas->id]);
     $postres = Categoria::factory()->create();
-    $esperada = Receta::factory()->publicada()->create(['nombre' => 'Arroz 100% casero']);
+    $subPostres = Subcategoria::factory()->create(['categoria_id' => $postres->id]);
+    $esperada = Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz 100% casero',
+        'categoria_id' => $comidas->id,
+        'subcategoria_id' => $subComidas->id,
+    ]);
     $esperada->ingredientes()->attach($arroz->id, ['orden' => 1]);
-    $esperada->categorias()->attach($comidas->id);
-    $otraCategoria = Receta::factory()->publicada()->create(['nombre' => 'Arroz 100% dulce']);
+    $otraCategoria = Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz 100% dulce',
+        'categoria_id' => $postres->id,
+        'subcategoria_id' => $subPostres->id,
+    ]);
     $otraCategoria->ingredientes()->attach($arroz->id, ['orden' => 1]);
-    $otraCategoria->categorias()->attach($postres->id);
-    $otroNombre = Receta::factory()->publicada()->create(['nombre' => 'Arroz 100X casero']);
+    $otroNombre = Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz 100X casero',
+        'categoria_id' => $comidas->id,
+        'subcategoria_id' => $subComidas->id,
+    ]);
     $otroNombre->ingredientes()->attach($arroz->id, ['orden' => 1]);
-    $otroNombre->categorias()->attach($comidas->id);
-    $otroIngrediente = Receta::factory()->publicada()->create(['nombre' => 'Pollo 100% casero']);
+    $otroIngrediente = Receta::factory()->publicada()->create([
+        'nombre' => 'Pollo 100% casero',
+        'categoria_id' => $comidas->id,
+        'subcategoria_id' => $subComidas->id,
+    ]);
     $otroIngrediente->ingredientes()->attach($pollo->id, ['orden' => 1]);
-    $otroIngrediente->categorias()->attach($comidas->id);
 
     $this->getJson('/api/v1/recetas?'.http_build_query([
         'ingredientes' => [$arroz->id], 'buscar' => '100%', 'categoria_id' => $comidas->id,
@@ -115,8 +130,12 @@ test('sin coincidencias devuelve una coleccion vacia con metadatos coherentes', 
 
 test('la seleccion vacia conserva la busqueda normal sin comparacion', function () {
     $categoria = Categoria::factory()->create();
-    $receta = Receta::factory()->publicada()->create(['nombre' => 'Arroz']);
-    $receta->categorias()->attach($categoria->id);
+    $subcategoria = Subcategoria::factory()->create(['categoria_id' => $categoria->id]);
+    $receta = Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
+    ]);
     $filtros = ['buscar' => 'Arroz', 'categoria_id' => $categoria->id, 'per_page' => 1];
     $normal = $this->call('GET', '/api/v1/recetas', $filtros);
 
@@ -271,5 +290,5 @@ test('la cantidad de consultas no crece por receta ni por ingrediente selecciona
     $this->getJson('/api/v1/recetas?'.http_build_query(['ingredientes' => $ids, 'per_page' => 15]))
         ->assertOk()->assertJsonCount(15, 'data');
 
-    expect(count($consultas))->toBe($cantidadUna)->toBeLessThanOrEqual(5);
+    expect(count($consultas))->toBe($cantidadUna)->toBeLessThanOrEqual(6);
 });

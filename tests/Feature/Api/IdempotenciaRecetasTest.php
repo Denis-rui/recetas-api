@@ -1,7 +1,6 @@
 <?php
 
 use App\Actions\Recetas\ContenidoRevision;
-use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
@@ -21,7 +20,6 @@ function recetaParaReintento(User $autor, bool $publicada = false): Receta
     $receta->imagen = "recetas/{$receta->id}/original.png";
     $receta->save();
     Storage::disk('local')->put($receta->imagen, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII='));
-    $receta->categorias()->attach(Categoria::factory()->create());
     $receta->ingredientes()->attach(Ingrediente::factory()->create(), ['cantidad' => 2, 'unidad' => 'tazas', 'notas' => null, 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Cocinar el arroz.']);
 
@@ -191,17 +189,15 @@ test('reintentar publicacion eliminada recupera el resultado sin resucitarla', f
 test('la validacion de contenido no normaliza identificadores mal formados antes de comprobarlos', function () {
     $receta = recetaParaReintento(User::factory()->create(), true);
     $contenido = app(ContenidoRevision::class)->vigente($receta);
-    $contenido['categorias'] = [' '.$contenido['categorias'][0].' '];
+    $contenido['categoria_id'] = ' '.$contenido['categoria_id'].' ';
 
     expect(fn () => app(ContenidoRevision::class)->validar($contenido, $receta))
         ->toThrow(ValidationException::class);
 });
 
-test('recupera correccion historica aunque el envio omita tips y use categorias en otro orden o como cadenas', function () {
+test('recupera correccion historica aunque el envio omita tips y use ids de clasificacion como cadenas o ingredientes y pasos en otro orden', function () {
     $autor = User::factory()->create(['rol' => 'usuario']);
     $receta = recetaParaReintento($autor, true);
-    $categoriaAdicional = Categoria::factory()->create();
-    $receta->categorias()->attach($categoriaAdicional);
     $receta->ingredientes()->attach(Ingrediente::factory()->create(), ['cantidad' => 1, 'unidad' => 'taza', 'notas' => null, 'orden' => 2]);
     $receta->pasos()->create(['orden' => 2, 'instruccion' => 'Servir caliente.']);
     $contenidoGuardado = app(ContenidoRevision::class)->vigente($receta);
@@ -212,7 +208,8 @@ test('recupera correccion historica aunque el envio omita tips y use categorias 
     ]);
     $contenidoEnviado = $contenidoGuardado;
     unset($contenidoEnviado['tips']);
-    $contenidoEnviado['categorias'] = array_map('strval', array_reverse($contenidoGuardado['categorias']));
+    $contenidoEnviado['categoria_id'] = (string) $contenidoGuardado['categoria_id'];
+    $contenidoEnviado['subcategoria_id'] = (string) $contenidoGuardado['subcategoria_id'];
     $contenidoEnviado['ingredientes'] = array_reverse($contenidoGuardado['ingredientes']);
     $contenidoEnviado['pasos'] = array_reverse($contenidoGuardado['pasos']);
     $receta->version = 2;

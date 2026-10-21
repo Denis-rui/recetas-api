@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -21,7 +22,9 @@ beforeEach(function () {
     $this->token = $this->usuario->createToken('Movil')->plainTextToken;
 
     $this->categoria1 = Categoria::factory()->create(['nombre' => 'Comidas']);
+    $this->subcategoria1 = Subcategoria::factory()->create(['categoria_id' => $this->categoria1->id, 'nombre' => 'Platos de fondo']);
     $this->categoria2 = Categoria::factory()->create(['nombre' => 'Bebidas']);
+    $this->subcategoria2 = Subcategoria::factory()->create(['categoria_id' => $this->categoria2->id, 'nombre' => 'Refrescos']);
     $this->ingrediente1 = Ingrediente::factory()->create(['nombre' => 'Arroz']);
     $this->ingrediente2 = Ingrediente::factory()->create(['nombre' => 'Pollo']);
     $this->ingrediente3 = Ingrediente::factory()->create(['nombre' => 'Cebolla']);
@@ -36,7 +39,8 @@ function payloadRecetaValida(array $overrides = []): array
         'porciones' => 4,
         'tiempo_preparacion' => 45,
         'tips' => 'Dejar dorar bien el pollo antes del arroz.',
-        'categorias' => [1],
+        'categoria_id' => 1,
+        'subcategoria_id' => 1,
         'ingredientes' => [
             [
                 'ingrediente_id' => 1,
@@ -98,7 +102,8 @@ test('crea receta privada exitosamente con imagen y no aparece en el catalogo pu
     $imagen = fakeJpgUpload('arroz_pollo.jpg');
 
     $payload = payloadRecetaValida([
-        'categorias' => [$this->categoria1->id, $this->categoria2->id],
+        'categoria_id' => $this->categoria1->id,
+        'subcategoria_id' => $this->subcategoria1->id,
         'ingredientes' => [
             [
                 'ingrediente_id' => $this->ingrediente1->id,
@@ -130,7 +135,10 @@ test('crea receta privada exitosamente con imagen y no aparece en el catalogo pu
         ->assertJsonPath('data.porciones', 4)
         ->assertJsonPath('data.tiempo_preparacion', 45)
         ->assertJsonPath('data.tips', 'Dejar dorar bien el pollo antes del arroz.')
-        ->assertJsonCount(2, 'data.categorias')
+        ->assertJsonPath('data.categoria.id', $this->categoria1->id)
+        ->assertJsonPath('data.categoria.nombre', 'Comidas')
+        ->assertJsonPath('data.subcategoria.id', $this->subcategoria1->id)
+        ->assertJsonPath('data.subcategoria.nombre', 'Platos de fondo')
         ->assertJsonCount(2, 'data.ingredientes')
         ->assertJsonCount(1, 'data.pasos');
 
@@ -282,10 +290,11 @@ test('edicion exitosa de receta privada incrementa la version a 2', function () 
         'nombre' => 'Version 1 Inicial',
         'porciones' => 2,
         'tiempo_preparacion' => 20,
+        'categoria_id' => $this->categoria1->id,
+        'subcategoria_id' => $this->subcategoria1->id,
         'publicada_en' => null,
         'version' => 1,
     ]);
-    $receta->categorias()->attach($this->categoria1->id);
     $receta->ingredientes()->attach($this->ingrediente1->id, ['cantidad' => 1, 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Paso uno']);
 
@@ -294,7 +303,8 @@ test('edicion exitosa de receta privada incrementa la version a 2', function () 
             'version' => 1,
             'nombre' => 'Version 2 Editada',
             'porciones' => 5,
-            'categorias' => [$this->categoria2->id],
+            'categoria_id' => $this->categoria2->id,
+            'subcategoria_id' => $this->subcategoria2->id,
             'ingredientes' => [
                 [
                     'ingrediente_id' => $this->ingrediente2->id,
@@ -315,23 +325,60 @@ test('edicion exitosa de receta privada incrementa la version a 2', function () 
     $response->assertOk()
         ->assertJsonPath('data.nombre', 'Version 2 Editada')
         ->assertJsonPath('data.porciones', 5)
+        ->assertJsonPath('data.categoria.id', $this->categoria2->id)
+        ->assertJsonPath('data.subcategoria.id', $this->subcategoria2->id)
         ->assertJsonPath('data.version', 2);
 
     $this->assertDatabaseHas('recetas', [
         'id' => $receta->id,
         'nombre' => 'Version 2 Editada',
+        'categoria_id' => $this->categoria2->id,
+        'subcategoria_id' => $this->subcategoria2->id,
         'version' => 2,
         'actualizado_por' => $this->usuario->id,
     ]);
 });
 
+test('rechaza creacion y actualizacion cuando subcategoria_id no pertenece a categoria_id', function () {
+    $imagen = fakeJpgUpload('arroz_pollo.jpg');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post('/api/v1/mis-recetas', [
+            ...payloadRecetaValida([
+                'categoria_id' => $this->categoria1->id,
+                'subcategoria_id' => $this->subcategoria2->id,
+            ]),
+            'imagen' => $imagen,
+        ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('subcategoria_id');
+
+    $receta = Receta::factory()->create([
+        'creado_por' => $this->usuario->id,
+        'categoria_id' => $this->categoria1->id,
+        'subcategoria_id' => $this->subcategoria1->id,
+        'publicada_en' => null,
+        'version' => 1,
+    ]);
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->putJson("/api/v1/mis-recetas/{$receta->id}", payloadRecetaValida([
+            'version' => 1,
+            'categoria_id' => $this->categoria1->id,
+            'subcategoria_id' => $this->subcategoria2->id,
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('subcategoria_id');
+});
+
 test('rechaza edicion con HTTP 409 Conflict si la version enviada no coincide', function () {
     $receta = Receta::factory()->create([
         'creado_por' => $this->usuario->id,
+        'categoria_id' => $this->categoria1->id,
+        'subcategoria_id' => $this->subcategoria1->id,
         'version' => 2,
         'publicada_en' => null,
     ]);
-    $receta->categorias()->attach($this->categoria1->id);
     $receta->ingredientes()->attach($this->ingrediente1->id, ['cantidad' => 1, 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Paso uno']);
 
@@ -340,7 +387,8 @@ test('rechaza edicion con HTTP 409 Conflict si la version enviada no coincide', 
         ->putJson("/api/v1/mis-recetas/{$receta->id}", payloadRecetaValida([
             'version' => 1,
             'nombre' => 'Intento con version desactualizada',
-            'categorias' => [$this->categoria1->id],
+            'categoria_id' => $this->categoria1->id,
+            'subcategoria_id' => $this->subcategoria1->id,
             'ingredientes' => [
                 ['ingrediente_id' => $this->ingrediente1->id, 'cantidad' => 1, 'unidad' => 'u', 'notas' => null, 'orden' => 1],
             ],
@@ -355,10 +403,11 @@ test('rechaza edicion con HTTP 409 Conflict si la version enviada no coincide', 
 test('bloquea edicion de receta privada si existe una solicitud de publicacion pendiente', function () {
     $receta = Receta::factory()->create([
         'creado_por' => $this->usuario->id,
+        'categoria_id' => $this->categoria1->id,
+        'subcategoria_id' => $this->subcategoria1->id,
         'publicada_en' => null,
         'version' => 1,
     ]);
-    $receta->categorias()->attach($this->categoria1->id);
     $receta->ingredientes()->attach($this->ingrediente1->id, ['cantidad' => 1, 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Paso uno']);
 
@@ -373,7 +422,8 @@ test('bloquea edicion de receta privada si existe una solicitud de publicacion p
         ->putJson("/api/v1/mis-recetas/{$receta->id}", payloadRecetaValida([
             'version' => 1,
             'nombre' => 'Intento de edicion mientras esta pendiente',
-            'categorias' => [$this->categoria1->id],
+            'categoria_id' => $this->categoria1->id,
+            'subcategoria_id' => $this->subcategoria1->id,
             'ingredientes' => [
                 ['ingrediente_id' => $this->ingrediente1->id, 'cantidad' => 1, 'unidad' => 'u', 'notas' => null, 'orden' => 1],
             ],

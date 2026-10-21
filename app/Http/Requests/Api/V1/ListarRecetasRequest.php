@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Api\V1;
 
 use App\Models\Ingrediente;
+use App\Models\Subcategoria;
 use App\Rules\IdentificadorEntero;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
@@ -36,6 +37,7 @@ class ListarRecetasRequest extends FormRequest
             'per_page' => ['sometimes', 'bail', new IdentificadorEntero, 'integer', 'between:1,50'],
             'buscar' => ['sometimes', 'nullable', 'string', 'max:100'],
             'categoria_id' => ['sometimes', 'bail', new IdentificadorEntero, 'exists:categorias,id'],
+            'subcategoria_id' => ['sometimes', 'bail', new IdentificadorEntero, 'exists:subcategorias,id'],
             'ingredientes' => ['sometimes', 'bail', 'array', 'list', 'max:50'],
             'ingredientes.*' => [
                 'bail',
@@ -55,6 +57,17 @@ class ListarRecetasRequest extends FormRequest
             function (Validator $validator): void {
                 if ($validator->errors()->isNotEmpty()) {
                     return;
+                }
+
+                if ($this->filled('categoria_id') && $this->filled('subcategoria_id')) {
+                    $corresponde = Subcategoria::query()
+                        ->whereKey((int) $this->input('subcategoria_id'))
+                        ->where('categoria_id', (int) $this->input('categoria_id'))
+                        ->exists();
+
+                    if (! $corresponde) {
+                        $validator->errors()->add('subcategoria_id', 'La subcategoría seleccionada no pertenece a la categoría indicada.');
+                    }
                 }
 
                 $ingredientes = $this->input('ingredientes', []);
@@ -81,6 +94,9 @@ class ListarRecetasRequest extends FormRequest
             'categoria_id.integer' => 'La categoría debe ser un número entero.',
             'categoria_id.min' => 'La categoría no es válida.',
             'categoria_id.exists' => 'La categoría seleccionada no es válida.',
+            'subcategoria_id.integer' => 'La subcategoría debe ser un número entero.',
+            'subcategoria_id.min' => 'La subcategoría no es válida.',
+            'subcategoria_id.exists' => 'La subcategoría seleccionada no es válida.',
             'ingredientes.array' => 'Los ingredientes deben enviarse como una lista de identificadores.',
             'ingredientes.list' => 'Los ingredientes deben formar una lista con índices consecutivos desde cero.',
             'ingredientes.max' => 'Puedes seleccionar como máximo 50 ingredientes.',

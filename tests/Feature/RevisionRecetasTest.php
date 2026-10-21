@@ -6,6 +6,7 @@ use App\Models\Ingrediente;
 use App\Models\PasoReceta;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Models\Valoracion;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -34,11 +35,17 @@ test('publica el contenido completo y registra la decision una sola vez', functi
     $this->actingAs($admin)->post("/revision-recetas/{$solicitud->id}/aprobar")
         ->assertRedirect("/revision-recetas/{$solicitud->id}")->assertSessionHas('exito');
 
-    $this->assertDatabaseHas('recetas', ['id' => $solicitud->receta_id, 'nombre' => 'Arroz con verduras mejorado', 'version' => 2, 'porciones' => 3]);
+    $this->assertDatabaseHas('recetas', [
+        'id' => $solicitud->receta_id,
+        'nombre' => 'Arroz con verduras mejorado',
+        'version' => 2,
+        'porciones' => 3,
+        'categoria_id' => $solicitud->contenido['categoria_id'],
+        'subcategoria_id' => $solicitud->contenido['subcategoria_id'],
+    ]);
     expect($solicitud->receta->fresh()->publicada_en->equalTo(now()))->toBeTrue();
     $this->assertDatabaseHas('solicitudes_revision', ['id' => $solicitud->id, 'estado' => 'aprobada', 'revisado_por' => $admin->id, 'revisada_en' => now()]);
     $this->assertDatabaseHas('ingrediente_receta', ['receta_id' => $solicitud->receta_id, 'cantidad' => 1.5, 'unidad' => 'tazas', 'notas' => 'Lavado', 'orden' => 1]);
-    $this->assertDatabaseHas('categoria_receta', ['receta_id' => $solicitud->receta_id, 'categoria_id' => $solicitud->contenido['categorias'][0]]);
     $this->assertDatabaseHas('pasos_receta', ['receta_id' => $solicitud->receta_id, 'orden' => 1, 'instruccion' => 'Cocinar a fuego lento.']);
 });
 
@@ -108,14 +115,13 @@ test('rechazar conserva todos los campos y relaciones vigentes', function (bool 
     $receta = $solicitud->receta;
     $ingrediente = Ingrediente::factory()->create();
     $receta->ingredientes()->attach($ingrediente, ['cantidad' => 2, 'orden' => 1]);
-    $receta->categorias()->attach(Categoria::factory()->create());
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Paso original']);
-    $antes = $receta->load('ingredientes', 'categorias', 'pasos')->toArray();
+    $antes = $receta->load('ingredientes', 'categoria', 'subcategoria', 'pasos')->toArray();
 
     $this->actingAs(adminRevision())->post("/revision-recetas/{$solicitud->id}/rechazar", ['motivo_rechazo' => '  Explica mejor los pasos.  '])
         ->assertSessionHas('exito');
 
-    expect($receta->fresh()->load('ingredientes', 'categorias', 'pasos')->toArray())->toEqual($antes);
+    expect($receta->fresh()->load('ingredientes', 'categoria', 'subcategoria', 'pasos')->toArray())->toEqual($antes);
     $this->assertDatabaseHas('solicitudes_revision', ['id' => $solicitud->id, 'estado' => 'rechazada', 'motivo_rechazo' => 'Explica mejor los pasos.']);
 })->with([false, true]);
 
@@ -125,8 +131,12 @@ test('una correccion confirmada como menor reemplaza relaciones y conserva favor
     $publicadaEn = $receta->publicada_en;
     $anterior = Ingrediente::factory()->create();
     $receta->ingredientes()->attach($anterior, ['cantidad' => 2, 'orden' => 1]);
-    $categoriaAnterior = Categoria::factory()->create();
-    $receta->categorias()->attach($categoriaAnterior);
+    $categoriaNueva = Categoria::factory()->create();
+    $subcategoriaNueva = Subcategoria::factory()->create(['categoria_id' => $categoriaNueva->id]);
+    $contenido = $solicitud->contenido;
+    $contenido['categoria_id'] = $categoriaNueva->id;
+    $contenido['subcategoria_id'] = $subcategoriaNueva->id;
+    $solicitud->update(['contenido' => $contenido]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Paso original']);
     $valoracion = Valoracion::factory()->create(['receta_id' => $receta->id]);
     $receta->usuariosQueLaGuardaron()->attach($valoracion->usuario_id);
@@ -138,7 +148,11 @@ test('una correccion confirmada como menor reemplaza relaciones y conserva favor
     expect($valoracion->fresh()->toArray())->toEqual($valoracion->toArray());
     expect(DB::table('favoritos')->where('receta_id', $receta->id)->first())->toEqual($favorito);
     $this->assertDatabaseMissing('ingrediente_receta', ['receta_id' => $receta->id, 'ingrediente_id' => $anterior->id]);
-    $this->assertDatabaseMissing('categoria_receta', ['receta_id' => $receta->id, 'categoria_id' => $categoriaAnterior->id]);
+    $this->assertDatabaseHas('recetas', [
+        'id' => $receta->id,
+        'categoria_id' => $categoriaNueva->id,
+        'subcategoria_id' => $subcategoriaNueva->id,
+    ]);
     $this->assertDatabaseMissing('pasos_receta', ['receta_id' => $receta->id, 'instruccion' => 'Paso original']);
 });
 
@@ -156,7 +170,8 @@ test('valida el JSON y referencias antes de cambiar la receta', function (string
 })->with([
     'campo administrativo' => ['creado_por', 123],
     'nombre vacio' => ['nombre', '   '],
-    'categoria inexistente' => ['categorias', [999999]],
+    'categoria inexistente' => ['categoria_id', 999999],
+    'subcategoria inexistente' => ['subcategoria_id', 999999],
     'ingrediente inexistente' => ['ingredientes.0.ingrediente_id', 999999],
     'cantidad negativa' => ['ingredientes.0.cantidad', -2],
     'orden invalido' => ['pasos.0.orden', 0],
@@ -171,7 +186,7 @@ test('revierte incluso campos y pivotes si falla la escritura de pasos', functio
     $receta = $solicitud->receta;
     $receta->ingredientes()->attach(Ingrediente::factory()->create(), ['cantidad' => 2, 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Conservar este paso']);
-    $antes = $receta->load('ingredientes', 'categorias', 'pasos')->toArray();
+    $antes = $receta->load('ingredientes', 'categoria', 'subcategoria', 'pasos')->toArray();
     PasoReceta::creating(function () {
         throw new RuntimeException('Fallo de escritura simulado');
     });
@@ -182,7 +197,7 @@ test('revierte incluso campos y pivotes si falla la escritura de pasos', functio
         PasoReceta::flushEventListeners();
     }
 
-    expect($receta->fresh()->load('ingredientes', 'categorias', 'pasos')->toArray())->toEqual($antes);
+    expect($receta->fresh()->load('ingredientes', 'categoria', 'subcategoria', 'pasos')->toArray())->toEqual($antes);
     $this->assertDatabaseHas('solicitudes_revision', ['id' => $solicitud->id, 'estado' => 'pendiente', 'revisado_por' => null]);
 });
 

@@ -55,6 +55,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
     // Rutas protegidas para cuentas activas (tokens móviles de Sanctum)
     Route::middleware(['auth:sanctum', 'api.activo', 'throttle:api-escrituras'])->group(function () {
         Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+        Route::get('/admin/categorias', [CatalogoCategoriaController::class, 'adminIndex'])->name('admin.categorias.index');
 
         Route::prefix('perfil')->name('perfil.')->group(function () {
             Route::get('/', [PerfilController::class, 'show'])->name('show');

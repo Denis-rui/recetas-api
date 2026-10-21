@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\User;
@@ -378,20 +377,17 @@ class RecetasPeruanasSeeder extends Seeder
 
         DB::transaction(function () use ($recetas, $admin) {
             foreach ($recetas as $index => $datos) {
-                $categoria = Categoria::firstOrCreate(['nombre' => $datos['categoria']]);
-
-                $receta = Receta::updateOrCreate(
-                    ['nombre' => $datos['nombre']],
-                    [
-                        'descripcion' => $datos['descripcion'],
-                        'porciones' => $datos['porciones'],
-                        'tiempo_preparacion' => $datos['tiempo_preparacion'],
-                        'tips' => $datos['tips'],
-                        'imagen' => 'temporal.png', // Temporary value to pass validation
-                        'creado_por' => $admin->id,
-                        'publicada_en' => now(),
-                    ]
-                );
+                $receta = Receta::firstOrNew(['nombre' => $datos['nombre']]);
+                $receta->fill([
+                    'descripcion' => $datos['descripcion'],
+                    'porciones' => $datos['porciones'],
+                    'tiempo_preparacion' => $datos['tiempo_preparacion'],
+                    'tips' => $datos['tips'],
+                    'imagen' => 'temporal.png',
+                ]);
+                $receta->creado_por = $receta->creado_por ?? $admin->id;
+                $receta->publicada_en = $receta->publicada_en ?? now();
+                $receta->permitirSinClasificacionHistorica()->save();
 
                 $nombreBase = Str::slug($datos['nombre']);
                 $rutaOrigenBusqueda = database_path('seeders/imagenes/'.$nombreBase.'.*');
@@ -414,9 +410,7 @@ class RecetasPeruanasSeeder extends Seeder
                         base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII=')
                     );
                 }
-                $receta->update(['imagen' => $imagenRuta]);
-
-                $receta->categorias()->sync([$categoria->id]);
+                $receta->permitirSinClasificacionHistorica()->update(['imagen' => $imagenRuta]);
 
                 $ingredientesSync = [];
                 foreach ($datos['ingredientes'] as $orden => $ing) {

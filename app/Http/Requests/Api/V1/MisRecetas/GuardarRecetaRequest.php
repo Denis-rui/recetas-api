@@ -14,7 +14,7 @@ class GuardarRecetaRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        foreach (['categorias', 'ingredientes', 'pasos'] as $campo) {
+        foreach (['ingredientes', 'pasos'] as $campo) {
             if ($this->has($campo) && is_string($this->input($campo))) {
                 $decodificado = json_decode($this->input($campo), true);
                 if (is_array($decodificado)) {
@@ -40,8 +40,8 @@ class GuardarRecetaRequest extends FormRequest
             'porciones' => ['required', 'integer', 'between:1,65535'],
             'tiempo_preparacion' => ['required', 'integer', 'between:1,65535'],
             'tips' => ['nullable', 'string', 'max:16000'],
-            'categorias' => ['required', 'array', 'list', 'min:1', 'max:100'],
-            'categorias.*' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
+            'categoria_id' => ['bail', 'required', new IdentificadorEntero],
+            'subcategoria_id' => ['bail', 'required', new IdentificadorEntero],
             'ingredientes' => ['required', 'array', 'list', 'min:1', 'max:500'],
             'ingredientes.*' => ['required', 'array:ingrediente_id,cantidad,unidad,notas,orden'],
             'ingredientes.*.ingrediente_id' => ['bail', 'required', new IdentificadorEntero, 'distinct'],

@@ -5,6 +5,7 @@ namespace App\Http\Resources\Api\V1;
 use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -20,22 +21,32 @@ class MiSolicitudDetalleResource extends JsonResource
     {
         $contenido = $this->contenido ?? [];
 
-        // Resolver nombres de categorías e ingredientes contenidos en la propuesta
-        $categoriasIds = $contenido['categorias'] ?? [];
+        // Resolver nombres de categoría, subcategoría e ingredientes contenidos en la propuesta
+        $categoriaId = $contenido['categoria_id'] ?? null;
+        $subcategoriaId = $contenido['subcategoria_id'] ?? null;
         $ingredientesIds = array_column($contenido['ingredientes'] ?? [], 'ingrediente_id');
 
-        $nombresCategorias = ! empty($categoriasIds)
-            ? Categoria::whereIn('id', $categoriasIds)->pluck('nombre', 'id')->all()
-            : [];
+        $categoria = $categoriaId !== null
+            ? Categoria::query()->select(['id', 'nombre'])->find((int) $categoriaId)
+            : null;
+
+        $subcategoria = $subcategoriaId !== null
+            ? Subcategoria::query()->select(['id', 'nombre'])->find((int) $subcategoriaId)
+            : null;
 
         $nombresIngredientes = ! empty($ingredientesIds)
             ? Ingrediente::whereIn('id', $ingredientesIds)->pluck('nombre', 'id')->all()
             : [];
 
-        $categoriasEnriquecidas = array_map(fn ($catId) => [
-            'id' => (int) $catId,
-            'nombre' => $nombresCategorias[$catId] ?? "Categoría #{$catId}",
-        ], $categoriasIds);
+        $categoriaEnriquecida = $categoriaId !== null ? [
+            'id' => (int) $categoriaId,
+            'nombre' => $categoria?->nombre ?? "Categoría #{$categoriaId}",
+        ] : null;
+
+        $subcategoriaEnriquecida = $subcategoriaId !== null ? [
+            'id' => (int) $subcategoriaId,
+            'nombre' => $subcategoria?->nombre ?? "Subcategoría #{$subcategoriaId}",
+        ] : null;
 
         $ingredientesEnriquecidos = array_map(fn ($item) => [
             'ingrediente_id' => (int) $item['ingrediente_id'],
@@ -53,7 +64,8 @@ class MiSolicitudDetalleResource extends JsonResource
             'tiempo_preparacion' => (int) ($contenido['tiempo_preparacion'] ?? 0),
             'tips' => $contenido['tips'] ?? null,
             'imagen_url' => route('api.v1.mis-solicitudes.imagen', ['solicitud' => $this->id]),
-            'categorias' => $categoriasEnriquecidas,
+            'categoria' => $categoriaEnriquecida,
+            'subcategoria' => $subcategoriaEnriquecida,
             'ingredientes' => $ingredientesEnriquecidos,
             'pasos' => $contenido['pasos'] ?? [],
         ];

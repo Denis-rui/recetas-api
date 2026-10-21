@@ -3,6 +3,7 @@
 use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
+use App\Models\Subcategoria;
 use App\Models\User;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
@@ -29,10 +30,13 @@ test('identificadores de recetas no aceptan representaciones numericas impropias
 
 test('catalogo no normaliza identificadores de categoria e ingredientes en consulta', function (string $id) {
     Categoria::factory()->create(['id' => 1]);
+    Subcategoria::factory()->create(['id' => 1, 'categoria_id' => 1]);
     Ingrediente::factory()->create(['id' => 1]);
 
     $this->getJson('/api/v1/recetas?'.http_build_query(['categoria_id' => $id]))
         ->assertUnprocessable()->assertJsonValidationErrors('categoria_id');
+    $this->getJson('/api/v1/recetas?'.http_build_query(['subcategoria_id' => $id]))
+        ->assertUnprocessable()->assertJsonValidationErrors('subcategoria_id');
     $this->getJson('/api/v1/recetas?'.http_build_query(['ingredientes' => [$id]]))
         ->assertUnprocessable()->assertJsonValidationErrors('ingredientes.0');
 })->with(['+1', ' 1 ', '1.0', '1e0', '9223372036854775808']);

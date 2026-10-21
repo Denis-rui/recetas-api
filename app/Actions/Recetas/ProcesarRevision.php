@@ -50,7 +50,7 @@ class ProcesarRevision
                     throw ValidationException::withMessages(['confirmar_correccion_menor' => 'Verifica que sea una corrección menor. Si transforma la preparación, rechaza la solicitud e indica que debe crearse una receta nueva.']);
                 }
                 $datos = $this->contenido->validar($actual->contenido, $receta, true);
-                $receta->fill(Arr::only($datos, ['nombre', 'descripcion', 'imagen', 'porciones', 'tiempo_preparacion', 'tips']));
+                $receta->fill(Arr::only($datos, ['nombre', 'descripcion', 'imagen', 'porciones', 'tiempo_preparacion', 'tips', 'categoria_id', 'subcategoria_id']));
                 $receta->actualizado_por = $adminActual->id;
                 $receta->publicada_en ??= now();
                 $receta->version++;
@@ -60,7 +60,6 @@ class ProcesarRevision
                 foreach ($datos['ingredientes'] as $ingrediente) {
                     $pivotes[$ingrediente['ingrediente_id']] = Arr::except($ingrediente, 'ingrediente_id');
                 }
-                $receta->categorias()->sync($datos['categorias']);
                 $receta->ingredientes()->sync($pivotes);
                 $receta->pasos()->delete();
                 $receta->pasos()->createMany($datos['pasos']);

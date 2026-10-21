@@ -5,6 +5,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Models\Valoracion;
 use Illuminate\Support\Facades\DB;
@@ -27,10 +28,14 @@ beforeEach(function () {
 
 test('acceso publico sin autenticacion a categorias, ingredientes y recetas', function () {
     $categoria = Categoria::factory()->create(['nombre' => 'Comidas']);
+    $subcategoria = Subcategoria::factory()->create(['categoria_id' => $categoria->id, 'nombre' => 'Criollos']);
     $ingrediente = Ingrediente::factory()->create(['nombre' => 'Arroz']);
 
-    $receta = Receta::factory()->publicada()->create(['nombre' => 'Arroz con Mariscos']);
-    $receta->categorias()->attach($categoria->id);
+    $receta = Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz con Mariscos',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
+    ]);
     $receta->ingredientes()->attach($ingrediente->id, ['orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Cocinar todo']);
 
@@ -40,7 +45,7 @@ test('acceso publico sin autenticacion a categorias, ingredientes y recetas', fu
     // Categorías sin sesión ni token
     $this->getJson('/api/v1/categorias')
         ->assertStatus(200)
-        ->assertJsonStructure(['data' => [['id', 'nombre']]]);
+        ->assertJsonStructure(['data' => [['id', 'nombre', 'subcategorias' => [['id', 'nombre']]]]]);
 
     // Ingredientes sin sesión ni token
     $this->getJson('/api/v1/ingredientes')
@@ -55,7 +60,9 @@ test('acceso publico sin autenticacion a categorias, ingredientes y recetas', fu
     // Detalle de receta
     $this->getJson("/api/v1/recetas/{$receta->id}")
         ->assertStatus(200)
-        ->assertJsonPath('data.id', $receta->id);
+        ->assertJsonPath('data.id', $receta->id)
+        ->assertJsonPath('data.categoria.id', $categoria->id)
+        ->assertJsonPath('data.subcategoria.id', $subcategoria->id);
 
     // Imagen vigente de receta
     $this->get("/api/v1/recetas/{$receta->id}/imagen")
@@ -65,23 +72,36 @@ test('acceso publico sin autenticacion a categorias, ingredientes y recetas', fu
 
 test('exclusion de recetas privadas y eliminadas en listado, busqueda y filtros', function () {
     $categoria = Categoria::factory()->create();
+    $subcategoria = Subcategoria::factory()->create(['categoria_id' => $categoria->id]);
 
     // 1. Receta pública normal
-    $publica = Receta::factory()->publicada()->create(['nombre' => 'Ceviche Mixto']);
-    $publica->categorias()->attach($categoria->id);
+    $publica = Receta::factory()->publicada()->create([
+        'nombre' => 'Ceviche Mixto',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
+    ]);
 
     // 2. Receta privada (sin publicar)
-    $privada = Receta::factory()->create(['nombre' => 'Ceviche Privado']);
-    $privada->categorias()->attach($categoria->id);
+    $privada = Receta::factory()->create([
+        'nombre' => 'Ceviche Privado',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
+    ]);
 
     // 3. Receta pública pero eliminada (soft delete)
-    $eliminada = Receta::factory()->publicada()->create(['nombre' => 'Ceviche Eliminado']);
-    $eliminada->categorias()->attach($categoria->id);
+    $eliminada = Receta::factory()->publicada()->create([
+        'nombre' => 'Ceviche Eliminado',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
+    ]);
     $eliminada->delete();
 
     // 4. Receta privada con solicitud de revision en curso
-    $privadaConSolicitud = Receta::factory()->create(['nombre' => 'Ceviche En Revision']);
-    $privadaConSolicitud->categorias()->attach($categoria->id);
+    $privadaConSolicitud = Receta::factory()->create([
+        'nombre' => 'Ceviche En Revision',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
+    ]);
     SolicitudRevision::factory()->create([
         'receta_id' => $privadaConSolicitud->id,
         'estado' => 'pendiente',
@@ -190,25 +210,46 @@ test('conservacion del contenido vigente cuando hay una correccion pendiente', f
 
 test('busqueda por nombre tratando caracteres comodin como literales y filtro por categoria', function () {
     $cat1 = Categoria::factory()->create(['nombre' => 'Comidas']);
+    $sub1A = Subcategoria::factory()->create(['categoria_id' => $cat1->id, 'nombre' => 'Arroces']);
+    $sub1B = Subcategoria::factory()->create(['categoria_id' => $cat1->id, 'nombre' => 'Sopas']);
     $cat2 = Categoria::factory()->create(['nombre' => 'Postres']);
+    $sub2A = Subcategoria::factory()->create(['categoria_id' => $cat2->id, 'nombre' => 'Tartas']);
 
-    $rPorcentaje = Receta::factory()->publicada()->create(['nombre' => 'Arroz 100% Casero']);
-    $rPorcentaje->categorias()->attach($cat1->id);
+    Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz 100% Casero',
+        'categoria_id' => $cat1->id,
+        'subcategoria_id' => $sub1A->id,
+    ]);
 
-    $rEquis = Receta::factory()->publicada()->create(['nombre' => 'Arroz 100X Casero']);
-    $rEquis->categorias()->attach($cat1->id);
+    Receta::factory()->publicada()->create([
+        'nombre' => 'Arroz 100X Casero',
+        'categoria_id' => $cat1->id,
+        'subcategoria_id' => $sub1A->id,
+    ]);
 
-    $rGuionBajo = Receta::factory()->publicada()->create(['nombre' => 'Sopa_Criolla']);
-    $rGuionBajo->categorias()->attach($cat1->id);
+    Receta::factory()->publicada()->create([
+        'nombre' => 'Sopa_Criolla',
+        'categoria_id' => $cat1->id,
+        'subcategoria_id' => $sub1B->id,
+    ]);
 
-    $rGuionEquis = Receta::factory()->publicada()->create(['nombre' => 'SopaXCriolla']);
-    $rGuionEquis->categorias()->attach($cat1->id);
+    Receta::factory()->publicada()->create([
+        'nombre' => 'SopaXCriolla',
+        'categoria_id' => $cat1->id,
+        'subcategoria_id' => $sub1B->id,
+    ]);
 
-    $rExclamacion = Receta::factory()->publicada()->create(['nombre' => 'Tarta!Especial']);
-    $rExclamacion->categorias()->attach($cat2->id);
+    Receta::factory()->publicada()->create([
+        'nombre' => 'Tarta!Especial',
+        'categoria_id' => $cat2->id,
+        'subcategoria_id' => $sub2A->id,
+    ]);
 
-    $rExclamacionEquis = Receta::factory()->publicada()->create(['nombre' => 'TartaXEspecial']);
-    $rExclamacionEquis->categorias()->attach($cat2->id);
+    Receta::factory()->publicada()->create([
+        'nombre' => 'TartaXEspecial',
+        'categoria_id' => $cat2->id,
+        'subcategoria_id' => $sub2A->id,
+    ]);
 
     // 1. Comodín % tratado como texto literal
     $respPorcentaje = $this->getJson('/api/v1/recetas?buscar=100%');
@@ -231,13 +272,33 @@ test('busqueda por nombre tratando caracteres comodin como literales y filtro po
     expect($nombresExcl)->toContain('Tarta!Especial')
         ->not->toContain('TartaXEspecial');
 
-    // 4. Filtro por categoria
-    $respCat = $this->getJson("/api/v1/recetas?categoria_id={$cat2->id}");
+    // 4. Filtro por categoria devuelve todas las recetas de esa categoria (ambas subcategorías)
+    $respCat = $this->getJson("/api/v1/recetas?categoria_id={$cat1->id}");
     $respCat->assertStatus(200);
     $nombresCat = collect($respCat->json('data'))->pluck('nombre')->all();
-    expect($nombresCat)->toContain('Tarta!Especial')
-        ->toContain('TartaXEspecial')
+    expect($nombresCat)->toContain('Arroz 100% Casero')
+        ->toContain('Sopa_Criolla')
+        ->not->toContain('Tarta!Especial');
+
+    // 4b. Filtro opcional por subcategoría reduce los resultados
+    $respSub = $this->getJson("/api/v1/recetas?categoria_id={$cat1->id}&subcategoria_id={$sub1B->id}");
+    $respSub->assertStatus(200);
+    $nombresSub = collect($respSub->json('data'))->pluck('nombre')->all();
+    expect($nombresSub)->toContain('Sopa_Criolla')
+        ->toContain('SopaXCriolla')
         ->not->toContain('Arroz 100% Casero');
+
+    // 4c. También admite subcategoria_id por sí sola
+    $respSoloSub = $this->getJson("/api/v1/recetas?subcategoria_id={$sub2A->id}");
+    $respSoloSub->assertStatus(200);
+    expect(collect($respSoloSub->json('data'))->pluck('nombre')->all())
+        ->toContain('Tarta!Especial')
+        ->not->toContain('Sopa_Criolla');
+
+    // 4d. Rechaza con 422 si subcategoria_id no pertenece a categoria_id
+    $this->getJson("/api/v1/recetas?categoria_id={$cat1->id}&subcategoria_id={$sub2A->id}")
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('subcategoria_id');
 
     // 5. Combinación de búsqueda y categoría
     $respComb = $this->getJson("/api/v1/recetas?categoria_id={$cat2->id}&buscar=Tarta!");
@@ -382,10 +443,14 @@ test('promedio y cantidad de valoraciones incluyendo cero votos', function () {
 });
 
 test('proyeccion exacta de campos sin datos internos ni sensibles', function () {
-    $receta = Receta::factory()->publicada()->create(['tips' => 'Servir caliente']);
     $cat = Categoria::factory()->create();
+    $sub = Subcategoria::factory()->create(['categoria_id' => $cat->id]);
+    $receta = Receta::factory()->publicada()->create([
+        'tips' => 'Servir caliente',
+        'categoria_id' => $cat->id,
+        'subcategoria_id' => $sub->id,
+    ]);
     $ing = Ingrediente::factory()->create();
-    $receta->categorias()->attach($cat->id);
     $receta->ingredientes()->attach($ing->id, ['orden' => 1, 'cantidad' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Paso 1']);
 
@@ -400,7 +465,8 @@ test('proyeccion exacta de campos sin datos internos ni sensibles', function () 
         'imagen_url',
         'porciones',
         'tiempo_preparacion',
-        'categorias',
+        'categoria',
+        'subcategoria',
         'valoracion_promedio',
         'cantidad_valoraciones',
         'ingredientes_resumen',
@@ -422,7 +488,8 @@ test('proyeccion exacta de campos sin datos internos ni sensibles', function () 
         'imagen_url',
         'porciones',
         'tiempo_preparacion',
-        'categorias',
+        'categoria',
+        'subcategoria',
         'valoracion_promedio',
         'cantidad_valoraciones',
         'ingredientes_resumen',
@@ -483,12 +550,15 @@ test('proteccion de imagenes privadas, pendientes y archivos ajenos', function (
 
 test('ausencia de consultas N+1 en el listado de recetas', function () {
     $categoria = Categoria::factory()->create();
+    $subcategoria = Subcategoria::factory()->create(['categoria_id' => $categoria->id]);
     $ingrediente = Ingrediente::factory()->create();
 
-    // Crear 15 recetas con categorías e ingredientes
+    // Crear 15 recetas con categoría, subcategoría e ingredientes
     for ($i = 0; $i < 15; $i++) {
-        $r = Receta::factory()->publicada()->create();
-        $r->categorias()->attach($categoria->id);
+        $r = Receta::factory()->publicada()->create([
+            'categoria_id' => $categoria->id,
+            'subcategoria_id' => $subcategoria->id,
+        ]);
         $r->ingredientes()->attach($ingrediente->id, ['orden' => 1]);
     }
 
@@ -504,8 +574,9 @@ test('ausencia de consultas N+1 en el listado de recetas', function () {
     // Número de consultas constante para 15 recetas:
     // 1. count(*) total de recetas
     // 2. select recetas con subconsultas de valoraciones e ingredientes
-    // 3. eager load de categorias
-    // 4. eager load de ingredientes
+    // 3. eager load de categoria
+    // 4. eager load de subcategoria
+    // 5. eager load de ingredientes
     expect(count($queriesSql))->toBeLessThanOrEqual(5);
 });
 
@@ -513,12 +584,15 @@ test('recorrido: aprobar una publicacion mediante la logica existente y consulta
     $admin = User::factory()->create(['rol' => 'administrador', 'activo' => true]);
     $autor = User::factory()->create(['rol' => 'usuario', 'activo' => true]);
     $categoria = Categoria::factory()->create(['nombre' => 'Comidas']);
+    $subcategoria = Subcategoria::factory()->create(['categoria_id' => $categoria->id, 'nombre' => 'Platos de fondo']);
     $arroz = Ingrediente::factory()->create(['nombre' => 'Arroz']);
 
     // Crear receta privada inicial con solicitud de publicación
     $receta = Receta::factory()->create([
         'creado_por' => $autor->id,
         'nombre' => 'Arroz con Pollo Criollo',
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
         'publicada_en' => null,
     ]);
     $imagen = crearImagenValida($receta->id, 'propuesta.png');
@@ -530,7 +604,8 @@ test('recorrido: aprobar una publicacion mediante la logica existente y consulta
         'porciones' => 4,
         'tiempo_preparacion' => 45,
         'tips' => 'Usa culantro fresco.',
-        'categorias' => [$categoria->id],
+        'categoria_id' => $categoria->id,
+        'subcategoria_id' => $subcategoria->id,
         'ingredientes' => [
             ['ingrediente_id' => $arroz->id, 'cantidad' => 2, 'unidad' => 'tazas', 'notas' => 'Lavado', 'orden' => 1],
         ],
@@ -581,14 +656,24 @@ test('recorrido: aprobar una publicacion mediante la logica existente y consulta
 });
 
 test('catalogo de categorias e ingredientes con orden y busqueda', function () {
-    Categoria::factory()->create(['nombre' => 'Zanahorias dulces']);
-    Categoria::factory()->create(['nombre' => 'Bebidas']);
-    Categoria::factory()->create(['nombre' => 'Almuerzos']);
+    $catZ = Categoria::factory()->create(['nombre' => 'Zanahorias dulces']);
+    Subcategoria::factory()->create(['categoria_id' => $catZ->id, 'nombre' => 'Pasteles']);
+
+    $catB = Categoria::factory()->create(['nombre' => 'Bebidas']);
+    Subcategoria::factory()->create(['categoria_id' => $catB->id, 'nombre' => 'Refrescos']);
+    Subcategoria::factory()->create(['categoria_id' => $catB->id, 'nombre' => 'Infusiones']);
+
+    $catA = Categoria::factory()->create(['nombre' => 'Almuerzos']);
+    Subcategoria::factory()->create(['categoria_id' => $catA->id, 'nombre' => 'Segundos']);
+
+    // Categoría sin subcategorías no aparece en el filtro público
+    Categoria::factory()->create(['nombre' => 'Categoria Sin Subcategorias']);
 
     $respCat = $this->getJson('/api/v1/categorias');
     $respCat->assertStatus(200);
     $nombresCat = collect($respCat->json('data'))->pluck('nombre')->all();
     expect($nombresCat)->toBe(['Almuerzos', 'Bebidas', 'Zanahorias dulces']);
+    expect(collect($respCat->json('data.1.subcategorias'))->pluck('nombre')->all())->toBe(['Infusiones', 'Refrescos']);
 
     // Ingredientes
     Ingrediente::factory()->create(['nombre' => 'Pimienta Negra']);
@@ -601,6 +686,85 @@ test('catalogo de categorias e ingredientes con orden y busqueda', function () {
     expect($nombresIng)->toContain('Pimienta Blanca')
         ->toContain('Pimienta Negra')
         ->not->toContain('Comino');
+});
+
+test('endpoint administrativo de categorias incluye categorias sin subcategorias y exige rol administrador', function () {
+    $catConSub = Categoria::factory()->create(['nombre' => 'Postres']);
+    $sub = Subcategoria::factory()->create(['categoria_id' => $catConSub->id, 'nombre' => 'Helados']);
+    $catSinSub = Categoria::factory()->create(['nombre' => 'Entradas']);
+
+    // Invitado -> 401
+    $this->getJson('/api/v1/admin/categorias')->assertUnauthorized();
+
+    // Usuario normal -> 403
+    $usuario = User::factory()->create(['rol' => 'usuario', 'activo' => true]);
+    $this->actingAs($usuario, 'sanctum')
+        ->getJson('/api/v1/admin/categorias')
+        ->assertForbidden();
+
+    // Administrador activo -> 200 con todas las categorías
+    $admin = User::factory()->create(['rol' => 'administrador', 'activo' => true]);
+    $resp = $this->actingAs($admin, 'sanctum')
+        ->getJson('/api/v1/admin/categorias')
+        ->assertOk();
+
+    expect($resp->json('data'))->toBe([
+        [
+            'id' => $catSinSub->id,
+            'nombre' => 'Entradas',
+            'subcategorias' => [],
+        ],
+        [
+            'id' => $catConSub->id,
+            'nombre' => 'Postres',
+            'subcategorias' => [
+                ['id' => $sub->id, 'nombre' => 'Helados'],
+            ],
+        ],
+    ]);
+});
+
+test('recetas historicas publicadas sin clasificacion siguen visibles en listado, aleatorias y detalle pero no coinciden con filtros de clasificacion', function () {
+    $cat = Categoria::factory()->create(['nombre' => 'Sopas']);
+    $sub = Subcategoria::factory()->create(['categoria_id' => $cat->id, 'nombre' => 'Caldos']);
+
+    $historica = Receta::factory()->publicada()->sinClasificacion()->create([
+        'nombre' => 'Caldo de Gallina Histórico',
+    ]);
+
+    $clasificada = Receta::factory()->publicada()->create([
+        'nombre' => 'Sopa a la Minuta',
+        'categoria_id' => $cat->id,
+        'subcategoria_id' => $sub->id,
+    ]);
+
+    // 1. Aparece en el listado general con categoria y subcategoria en null
+    $respListado = $this->getJson('/api/v1/recetas')->assertOk();
+    $porId = collect($respListado->json('data'))->keyBy('id');
+    expect($porId->has($historica->id))->toBeTrue();
+    expect($porId[$historica->id]['categoria'])->toBeNull();
+    expect($porId[$historica->id]['subcategoria'])->toBeNull();
+
+    // 2. Aparece en aleatorias con categoria y subcategoria en null
+    $respAleatorias = $this->getJson('/api/v1/recetas/aleatorias')->assertOk();
+    $aleatoriasPorId = collect($respAleatorias->json('data'))->keyBy('id');
+    expect($aleatoriasPorId->has($historica->id))->toBeTrue();
+    expect($aleatoriasPorId[$historica->id]['categoria'])->toBeNull();
+    expect($aleatoriasPorId[$historica->id]['subcategoria'])->toBeNull();
+
+    // 3. Aparece en el detalle con categoria y subcategoria en null
+    $this->getJson("/api/v1/recetas/{$historica->id}")
+        ->assertOk()
+        ->assertJsonPath('data.id', $historica->id)
+        ->assertJsonPath('data.categoria', null)
+        ->assertJsonPath('data.subcategoria', null);
+
+    // 4. Al filtrar por categoria_id o subcategoria_id solo coincide la clasificada
+    $respFiltroCat = $this->getJson("/api/v1/recetas?categoria_id={$cat->id}")->assertOk();
+    expect(collect($respFiltroCat->json('data'))->pluck('id')->all())->toBe([$clasificada->id]);
+
+    $respFiltroSub = $this->getJson("/api/v1/recetas?subcategoria_id={$sub->id}")->assertOk();
+    expect(collect($respFiltroSub->json('data'))->pluck('id')->all())->toBe([$clasificada->id]);
 });
 
 test('autenticacion como autor o administrador no amplia la visibilidad publica', function () {

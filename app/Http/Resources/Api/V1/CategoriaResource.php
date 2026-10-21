@@ -12,13 +12,17 @@ use Illuminate\Http\Resources\Json\JsonResource;
 class CategoriaResource extends JsonResource
 {
     /**
-     * @return array{id: int, nombre: string}
+     * @return array<string, mixed>
      */
     public function toArray(Request $request): array
     {
         return [
-            'id' => $this->id,
-            'nombre' => $this->nombre,
+            'id' => (int) $this->id,
+            'nombre' => (string) $this->nombre,
+            'subcategorias' => $this->whenLoaded('subcategorias', fn () => $this->subcategorias->map(fn ($subcategoria): array => [
+                'id' => (int) $subcategoria->id,
+                'nombre' => (string) $subcategoria->nombre,
+            ])->values()->all()),
         ];
     }
 }

@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Models\Valoracion;
 use Illuminate\Support\Facades\DB;
@@ -31,11 +32,16 @@ beforeEach(function () {
     $this->tokenAdmin = $this->admin->createToken('AdminMovil')->plainTextToken;
 
     $this->categoria = Categoria::factory()->create(['nombre' => 'Postres']);
+    $this->subcategoria = Subcategoria::factory()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Dulces limeños']);
     $this->ingrediente = Ingrediente::factory()->create(['nombre' => 'Azúcar']);
 });
 
 function crearRecetaCompleta(User $autor, bool $publicada = false): Receta
 {
+    $cat = Categoria::first() ?? Categoria::factory()->create();
+    $sub = Subcategoria::where('categoria_id', $cat->id)->first() ?? Subcategoria::factory()->create(['categoria_id' => $cat->id]);
+    $ing = Ingrediente::first() ?? Ingrediente::factory()->create();
+
     $receta = Receta::factory()->create([
         'creado_por' => $autor->id,
         'nombre' => 'Mazamorra Morada',
@@ -44,6 +50,8 @@ function crearRecetaCompleta(User $autor, bool $publicada = false): Receta
         'porciones' => 6,
         'tiempo_preparacion' => 40,
         'tips' => 'Añadir canela entera al hervir el maíz.',
+        'categoria_id' => $cat->id,
+        'subcategoria_id' => $sub->id,
         'version' => 1,
         'publicada_en' => $publicada ? now() : null,
     ]);
@@ -53,10 +61,6 @@ function crearRecetaCompleta(User $autor, bool $publicada = false): Receta
     // Guardar imagen física fake en disco local
     Storage::disk('local')->put($receta->imagen, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII='));
 
-    $cat = Categoria::first() ?? Categoria::factory()->create();
-    $ing = Ingrediente::first() ?? Ingrediente::factory()->create();
-
-    $receta->categorias()->attach($cat->id);
     $receta->ingredientes()->attach($ing->id, ['cantidad' => 200, 'unidad' => 'gramos', 'notas' => 'Blanca', 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Hervir maíz morado con especias.']);
 
@@ -187,7 +191,8 @@ test('cancelar solicitud propia pendiente mantiene receta privada y permite volv
             'porciones' => $receta->porciones,
             'tiempo_preparacion' => $receta->tiempo_preparacion,
             'tips' => $receta->tips,
-            'categorias' => [$this->categoria->id],
+            'categoria_id' => $this->categoria->id,
+            'subcategoria_id' => $this->subcategoria->id,
             'ingredientes' => [['ingrediente_id' => $this->ingrediente->id, 'cantidad' => 100, 'unidad' => 'g', 'notas' => null, 'orden' => 1]],
             'pasos' => [['orden' => 1, 'instruccion' => 'Paso 1']],
         ],
@@ -201,7 +206,8 @@ test('cancelar solicitud propia pendiente mantiene receta privada y permite volv
             'descripcion' => $receta->descripcion,
             'porciones' => 4,
             'tiempo_preparacion' => 30,
-            'categorias' => [$this->categoria->id],
+            'categoria_id' => $this->categoria->id,
+            'subcategoria_id' => $this->subcategoria->id,
             'ingredientes' => [['ingrediente_id' => $this->ingrediente->id, 'cantidad' => 100, 'unidad' => 'g', 'notas' => null, 'orden' => 1]],
             'pasos' => [['orden' => 1, 'instruccion' => 'Paso 1']],
         ])
@@ -234,7 +240,8 @@ test('cancelar solicitud propia pendiente mantiene receta privada y permite volv
             'descripcion' => $receta->descripcion,
             'porciones' => 4,
             'tiempo_preparacion' => 30,
-            'categorias' => [$this->categoria->id],
+            'categoria_id' => $this->categoria->id,
+            'subcategoria_id' => $this->subcategoria->id,
             'ingredientes' => [['ingrediente_id' => $this->ingrediente->id, 'cantidad' => 100, 'unidad' => 'g', 'notas' => null, 'orden' => 1]],
             'pasos' => [['orden' => 1, 'instruccion' => 'Paso 1']],
         ])
@@ -289,7 +296,8 @@ test('propuesta de correccion mantiene inalterada la receta publicada hasta su a
         'porciones' => 8,
         'tiempo_preparacion' => 50,
         'tips' => 'Añadir manzana picada y membrillo.',
-        'categorias' => [$this->categoria->id],
+        'categoria_id' => $this->categoria->id,
+        'subcategoria_id' => $this->subcategoria->id,
         'ingredientes' => [
             [
                 'ingrediente_id' => $this->ingrediente->id,
@@ -341,6 +349,44 @@ test('propuesta de correccion mantiene inalterada la receta publicada hasta su a
     expect(DB::table('favoritos')->where('receta_id', $receta->id)->count())->toBe(1);
 });
 
+test('propuesta de correccion rechaza subcategoria que no pertenece a la categoria indicada', function () {
+    $receta = crearRecetaCompleta($this->usuario, publicada: true);
+    $otraCategoria = Categoria::factory()->create(['nombre' => 'Bebidas']);
+    $otraSubcategoria = Subcategoria::factory()->create(['categoria_id' => $otraCategoria->id, 'nombre' => 'Chichas']);
+
+    $propuesta = [
+        'nombre' => 'Mazamorra Morada Mejorada',
+        'descripcion' => 'Descripción corregida.',
+        'imagen' => $receta->imagen,
+        'porciones' => 8,
+        'tiempo_preparacion' => 50,
+        'tips' => null,
+        'categoria_id' => $this->categoria->id,
+        'subcategoria_id' => $otraSubcategoria->id,
+        'ingredientes' => [
+            [
+                'ingrediente_id' => $this->ingrediente->id,
+                'cantidad' => 250,
+                'unidad' => 'gramos',
+                'notas' => null,
+                'orden' => 1,
+            ],
+        ],
+        'pasos' => [
+            ['orden' => 1, 'instruccion' => 'Cocer con frutas y colar.'],
+        ],
+    ];
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson("/api/v1/mis-recetas/{$receta->id}/corregir", [
+            'clave_idempotencia' => (string) Str::uuid(),
+            'version_base' => 1,
+            'contenido' => $propuesta,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('contenido.subcategoria_id');
+});
+
 test('administrador activo envia su correccion a revision sin modificar la receta publicada', function () {
     $recetaAdmin = crearRecetaCompleta($this->admin, publicada: true);
 
@@ -351,7 +397,8 @@ test('administrador activo envia su correccion a revision sin modificar la recet
         'porciones' => 5,
         'tiempo_preparacion' => 35,
         'tips' => 'Servir tibio con arroz con leche.',
-        'categorias' => [$this->categoria->id],
+        'categoria_id' => $this->categoria->id,
+        'subcategoria_id' => $this->subcategoria->id,
         'ingredientes' => [
             [
                 'ingrediente_id' => $this->ingrediente->id,
@@ -405,7 +452,8 @@ test('detalle de solicitud propia resuelve nombres de ingredientes y categorias 
             'porciones' => 2,
             'tiempo_preparacion' => 15,
             'tips' => null,
-            'categorias' => [$this->categoria->id],
+            'categoria_id' => $this->categoria->id,
+            'subcategoria_id' => $this->subcategoria->id,
             'ingredientes' => [
                 [
                     'ingrediente_id' => $this->ingrediente->id,
@@ -427,7 +475,8 @@ test('detalle de solicitud propia resuelve nombres de ingredientes y categorias 
     $response->assertOk()
         ->assertJsonPath('data.id', $solicitud->id)
         ->assertJsonPath('data.motivo_rechazo', 'Ampliar las instrucciones del paso 1.')
-        ->assertJsonPath('data.contenido.categorias.0.nombre', 'Postres')
+        ->assertJsonPath('data.contenido.categoria.nombre', 'Postres')
+        ->assertJsonPath('data.contenido.subcategoria.nombre', 'Dulces limeños')
         ->assertJsonPath('data.contenido.ingredientes.0.nombre', 'Azúcar')
         ->assertJsonMissing(['revisado_por', 'revisor']);
 });

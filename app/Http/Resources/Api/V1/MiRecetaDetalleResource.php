@@ -59,7 +59,18 @@ class MiRecetaDetalleResource extends JsonResource
             'visibilidad' => $visibilidad,
             'version' => (int) $this->version,
             'solicitud_pendiente' => $solicitudPendiente,
-            'categorias' => CategoriaResource::collection($this->whenLoaded('categorias')),
+            'categoria' => $this->relationLoaded('categoria') && $this->categoria !== null
+                ? [
+                    'id' => (int) $this->categoria->id,
+                    'nombre' => (string) $this->categoria->nombre,
+                ]
+                : null,
+            'subcategoria' => $this->relationLoaded('subcategoria') && $this->subcategoria !== null
+                ? [
+                    'id' => (int) $this->subcategoria->id,
+                    'nombre' => (string) $this->subcategoria->nombre,
+                ]
+                : null,
             'ingredientes' => $this->relationLoaded('ingredientes')
                 ? $this->ingredientes->sortBy(fn ($i) => $i->pivot->orden)->values()->map(fn ($ingrediente) => [
                     'ingrediente_id' => (int) $ingrediente->id,

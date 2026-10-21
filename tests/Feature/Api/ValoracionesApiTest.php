@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Models\Valoracion;
 use Illuminate\Support\Facades\Storage;
@@ -31,12 +32,18 @@ beforeEach(function () {
 
 function crearRecetaPublicaValoraciones(User $autor): Receta
 {
+    $cat = Categoria::first() ?? Categoria::factory()->create();
+    $sub = Subcategoria::where('categoria_id', $cat->id)->first() ?? Subcategoria::factory()->create(['categoria_id' => $cat->id]);
+    $ing = Ingrediente::first() ?? Ingrediente::factory()->create();
+
     $receta = Receta::factory()->publicada()->create([
         'creado_por' => $autor->id,
         'nombre' => 'Ají de Gallina Clásico',
         'descripcion' => 'Cremoso ají de gallina con pecanas y queso.',
         'porciones' => 4,
         'tiempo_preparacion' => 40,
+        'categoria_id' => $cat->id,
+        'subcategoria_id' => $sub->id,
         'imagen' => 'recetas/1/demo.png',
         'version' => 1,
     ]);
@@ -45,10 +52,6 @@ function crearRecetaPublicaValoraciones(User $autor): Receta
 
     Storage::disk('local')->put($receta->imagen, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII='));
 
-    $cat = Categoria::first() ?? Categoria::factory()->create();
-    $ing = Ingrediente::first() ?? Ingrediente::factory()->create();
-
-    $receta->categorias()->attach($cat->id);
     $receta->ingredientes()->attach($ing->id, ['cantidad' => 300, 'unidad' => 'gramos', 'notas' => 'Deshilachado', 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Licuar ají amarillo con pan y leche.']);
 
@@ -252,7 +255,8 @@ test('aprobacion de correccion en revision web conserva las valoraciones intacta
             'porciones' => $receta->porciones,
             'tiempo_preparacion' => $receta->tiempo_preparacion,
             'tips' => $receta->tips,
-            'categorias' => [Categoria::first()->id],
+            'categoria_id' => $receta->categoria_id,
+            'subcategoria_id' => $receta->subcategoria_id,
             'ingredientes' => [
                 [
                     'ingrediente_id' => Ingrediente::first()->id,

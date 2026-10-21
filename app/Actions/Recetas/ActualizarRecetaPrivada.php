@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Rules\IdentificadorEntero;
 use Illuminate\Http\UploadedFile;
@@ -48,8 +49,8 @@ class ActualizarRecetaPrivada
             'porciones' => ['required', 'integer', 'between:1,65535'],
             'tiempo_preparacion' => ['required', 'integer', 'between:1,65535'],
             'tips' => ['nullable', 'string', 'max:16000'],
-            'categorias' => ['required', 'array', 'list', 'min:1', 'max:100'],
-            'categorias.*' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
+            'categoria_id' => ['bail', 'required', new IdentificadorEntero],
+            'subcategoria_id' => ['bail', 'required', new IdentificadorEntero],
             'ingredientes' => ['required', 'array', 'list', 'min:1', 'max:500'],
             'ingredientes.*' => ['required', 'array:ingrediente_id,cantidad,unidad,notas,orden'],
             'ingredientes.*.ingrediente_id' => ['bail', 'required', new IdentificadorEntero, 'distinct'],
@@ -124,14 +125,21 @@ class ActualizarRecetaPrivada
                     throw new ConflictHttpException('Conflicto de versión. La receta ha sido modificada por otra operación. Recargue los datos antes de continuar.');
                 }
 
-                // Validar existencia de categorías e ingredientes con sharedLock
-                $categoriasQuery = Categoria::whereIn('id', $validados['categorias'])->orderBy('id')->sharedLock();
+                // Validar existencia y correspondencia de categoría, subcategoría e ingredientes con sharedLock
+                $categoria = Categoria::whereKey((int) $validados['categoria_id'])->sharedLock()->first(['id']);
+                $subcategoria = Subcategoria::whereKey((int) $validados['subcategoria_id'])->sharedLock()->first(['id', 'categoria_id']);
                 $ingredientesQuery = Ingrediente::whereIn('id', array_column($validados['ingredientes'], 'ingrediente_id'))->orderBy('id')->sharedLock();
 
-                if ($categoriasQuery->count() !== count($validados['categorias'])
+                if ($categoria === null || $subcategoria === null
                     || $ingredientesQuery->count() !== count($validados['ingredientes'])) {
                     throw ValidationException::withMessages([
-                        'contenido' => 'La receta contiene categorías o ingredientes que no existen.',
+                        'contenido' => 'La receta contiene categoría, subcategoría o ingredientes que no existen.',
+                    ]);
+                }
+
+                if ((int) $subcategoria->categoria_id !== (int) $categoria->id) {
+                    throw ValidationException::withMessages([
+                        'subcategoria_id' => 'La subcategoría seleccionada no pertenece a la categoría indicada.',
                     ]);
                 }
 
@@ -158,14 +166,11 @@ class ActualizarRecetaPrivada
                 $receta->porciones = (int) $validados['porciones'];
                 $receta->tiempo_preparacion = (int) $validados['tiempo_preparacion'];
                 $receta->tips = $validados['tips'] ?? null;
+                $receta->categoria_id = (int) $categoria->id;
+                $receta->subcategoria_id = (int) $subcategoria->id;
                 $receta->actualizado_por = $userActual->id;
                 $receta->version++;
                 $receta->save();
-
-                // Sincronizar categorías
-                $categoriasOrdenadas = array_map('intval', $validados['categorias']);
-                sort($categoriasOrdenadas);
-                $receta->categorias()->sync($categoriasOrdenadas);
 
                 // Sincronizar ingredientes
                 $pivotes = [];
@@ -180,7 +185,7 @@ class ActualizarRecetaPrivada
                 $pasosOrdenados = collect($validados['pasos'])->sortBy('orden')->values()->all();
                 $receta->pasos()->createMany($pasosOrdenados);
 
-                return $receta->loadMissing(['categorias', 'ingredientes', 'pasos']);
+                return $receta->loadMissing(['categoria:id,nombre', 'subcategoria:id,nombre', 'ingredientes', 'pasos']);
             }, attempts: 3);
         } catch (Throwable $e) {
             if ($archivoNuevoCreado !== null) {

@@ -41,7 +41,18 @@ class MiRecetaCatalogoResource extends JsonResource
             'imagen_url' => route('api.v1.mis-recetas.imagen', ['receta' => $this->id]),
             'porciones' => (int) $this->porciones,
             'tiempo_preparacion' => (int) $this->tiempo_preparacion,
-            'categorias' => CategoriaResource::collection($this->whenLoaded('categorias')),
+            'categoria' => $this->relationLoaded('categoria') && $this->categoria !== null
+                ? [
+                    'id' => (int) $this->categoria->id,
+                    'nombre' => (string) $this->categoria->nombre,
+                ]
+                : null,
+            'subcategoria' => $this->relationLoaded('subcategoria') && $this->subcategoria !== null
+                ? [
+                    'id' => (int) $this->subcategoria->id,
+                    'nombre' => (string) $this->subcategoria->nombre,
+                ]
+                : null,
             'ingredientes_resumen' => $this->relationLoaded('ingredientes')
                 ? $this->ingredientes->take(3)->map(fn ($ingrediente) => [
                     'ingrediente_id' => (int) $ingrediente->id,

@@ -31,7 +31,8 @@ class FavoritoController extends Controller
             ->withAvg('valoraciones as valoracion_promedio', 'puntuacion')
             ->withCount('valoraciones as cantidad_valoraciones')
             ->with([
-                'categorias:id,nombre',
+                'categoria:id,nombre',
+                'subcategoria:id,nombre',
                 'ingredientes' => fn ($subQuery) => $subQuery
                     ->select('ingredientes.id', 'ingredientes.nombre')
                     ->withPivot(['orden'])

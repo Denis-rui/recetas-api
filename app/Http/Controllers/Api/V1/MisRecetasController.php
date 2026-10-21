@@ -43,7 +43,8 @@ class MisRecetasController extends Controller
             ->where('creado_por', $usuario->id)
             ->withCount('ingredientes as cantidad_ingredientes')
             ->with([
-                'categorias:id,nombre',
+                'categoria:id,nombre',
+                'subcategoria:id,nombre',
                 'ingredientes' => fn ($subQuery) => $subQuery
                     ->select('ingredientes.id', 'ingredientes.nombre')
                     ->withPivot(['orden'])
@@ -102,7 +103,8 @@ class MisRecetasController extends Controller
         $recetaModel = $this->obtenerRecetaAutorizada($request, $receta);
 
         $recetaModel->loadMissing([
-            'categorias:id,nombre',
+            'categoria:id,nombre',
+            'subcategoria:id,nombre',
             'ingredientes' => fn ($q) => $q->withPivot(['cantidad', 'unidad', 'notas', 'orden'])->orderByPivot('orden'),
             'pasos' => fn ($q) => $q->orderBy('orden'),
             'solicitudesRevision' => fn ($q) => $q->where('estado', 'pendiente')->orderByDesc('id'),

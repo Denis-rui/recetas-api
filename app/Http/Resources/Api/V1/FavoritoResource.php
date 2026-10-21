@@ -41,7 +41,18 @@ class FavoritoResource extends JsonResource
             'porciones' => (int) $this->porciones,
             'tiempo_preparacion' => (int) $this->tiempo_preparacion,
             'visibilidad' => 'publicada',
-            'categorias' => CategoriaResource::collection($this->whenLoaded('categorias')),
+            'categoria' => $this->relationLoaded('categoria') && $this->categoria !== null
+                ? [
+                    'id' => (int) $this->categoria->id,
+                    'nombre' => (string) $this->categoria->nombre,
+                ]
+                : null,
+            'subcategoria' => $this->relationLoaded('subcategoria') && $this->subcategoria !== null
+                ? [
+                    'id' => (int) $this->subcategoria->id,
+                    'nombre' => (string) $this->subcategoria->nombre,
+                ]
+                : null,
             'valoracion_promedio' => $this->valoracion_promedio !== null
                 ? round((float) $this->valoracion_promedio, 2)
                 : null,

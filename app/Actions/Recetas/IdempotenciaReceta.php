@@ -35,7 +35,7 @@ class IdempotenciaReceta
                 return ['tipo' => 'solicitud', 'receta' => $receta, 'solicitud' => SolicitudRevision::findOrFail($operacion->solicitud_revision_id), 'reintento' => true];
             }
 
-            return ['tipo' => 'directa', 'receta' => $receta->load(['categorias', 'ingredientes', 'pasos']), 'reintento' => true];
+            return ['tipo' => 'directa', 'receta' => $receta->load(['categoria:id,nombre', 'subcategoria:id,nombre', 'ingredientes', 'pasos']), 'reintento' => true];
         }
 
         $anterior = SolicitudRevision::where('solicitado_por', $usuario->id)
@@ -85,14 +85,13 @@ class IdempotenciaReceta
     {
         $contenido = $this->contenidoRevision->normalizar($contenido);
         $contenido['tips'] = $contenido['tips'] ?? null;
-        if (isset($contenido['categorias']) && is_array($contenido['categorias'])) {
-            foreach ($contenido['categorias'] as $categoria) {
-                if (! IdentificadorEntero::esValido($categoria)) {
+        foreach (['categoria_id', 'subcategoria_id'] as $campoId) {
+            if (array_key_exists($campoId, $contenido)) {
+                if (! IdentificadorEntero::esValido($contenido[$campoId])) {
                     $this->rechazarReutilizacion();
                 }
+                $contenido[$campoId] = (int) $contenido[$campoId];
             }
-            $contenido['categorias'] = array_map('intval', $contenido['categorias']);
-            sort($contenido['categorias']);
         }
         foreach (['ingredientes', 'pasos'] as $campo) {
             if (isset($contenido[$campo]) && is_array($contenido[$campo])) {

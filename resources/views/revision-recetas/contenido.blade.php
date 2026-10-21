@@ -15,9 +15,14 @@
                 <p class="mt-2 whitespace-pre-line break-words text-sm">{{ $datos[$campo] ?? 'Sin tips' }}</p>
             </div>
         @endforeach
-        <div @class(['rounded-lg p-3', 'bg-amber-50 ring-1 ring-amber-200' => $diferencias['categorias'] ?? false])>
-            <h3 class="text-xs font-semibold uppercase text-slate-500">Categorías @if($diferencias['categorias'] ?? false)<span class="ml-2 text-amber-800">Modificado</span>@endif</h3>
-            <p class="mt-2 text-sm">{{ collect($datos['categorias'])->map(fn ($id) => $categorias[$id] ?? 'Categoría no disponible')->join(', ') }}</p>
+        <div @class(['rounded-lg p-3', 'bg-amber-50 ring-1 ring-amber-200' => ($diferencias['categoria_id'] ?? false) || ($diferencias['subcategoria_id'] ?? false)])>
+            <h3 class="text-xs font-semibold uppercase text-slate-500">Clasificación @if(($diferencias['categoria_id'] ?? false) || ($diferencias['subcategoria_id'] ?? false))<span class="ml-2 text-amber-800">Modificado</span>@endif</h3>
+            <p class="mt-2 text-sm">
+                {{ ($datos['categoria_id'] ?? null) !== null ? ($categorias[$datos['categoria_id']] ?? 'Categoría no disponible') : 'Sin categoría' }}
+                @if(($datos['subcategoria_id'] ?? null) !== null)
+                    · {{ $subcategorias[$datos['subcategoria_id']] ?? 'Subcategoría no disponible' }}
+                @endif
+            </p>
         </div>
         <div>
             <h3 class="mb-3 text-sm font-semibold">Ingredientes @if($diferencias['ingredientes'] ?? false)<span class="ml-2 text-xs text-amber-800">Modificados (incluye cantidades y orden)</span>@endif</h3>

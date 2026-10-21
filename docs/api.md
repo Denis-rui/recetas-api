@@ -79,31 +79,50 @@ La contraseña nueva debe ser diferente de la actual. La foto admite JPEG/JPG, P
 
 ## 4. Catálogo público y paginación
 
-| Método y ruta                  | Parámetros                                                     | Respuesta                                                                 |
-| ------------------------------ | -------------------------------------------------------------- | ------------------------------------------------------------------------- |
-| `GET /categorias`              | —                                                              | 200: `data` con `{id, nombre}`; sin paginación, ordenado por nombre e ID. |
-| `GET /ingredientes`            | `buscar`, `page`, `per_page`                                   | 200: colección paginada de `{id, nombre}`.                                |
-| `GET /recetas`                 | `buscar`, `categoria_id`, `ingredientes[]`, `page`, `per_page` | 200: catálogo paginado.                                                   |
-| `GET /recetas/{receta}`        | ID canónico                                                    | 200: detalle en `data`.                                                   |
-| `GET /recetas/{receta}/imagen` | ID canónico                                                    | 200: archivo; 404 si la receta o su imagen no están disponibles.          |
+| Método y ruta                  | Parámetros                                                                        | Respuesta                                                                                                               |
+| ------------------------------ | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `GET /categorias`              | —                                                                                 | 200: `data` con `{id, nombre, subcategorias: [{id, nombre}]}`; solo categorías con al menos una subcategoría, ordenado. |
+| `GET /admin/categorias`        | — (Autenticado con rol `administrador` activo)                                    | 200: `data` con `{id, nombre, subcategorias: [{id, nombre}]}`; incluye también categorías sin subcategorías (`[]`).     |
+| `GET /ingredientes`            | `buscar`, `page`, `per_page`                                                      | 200: colección paginada de `{id, nombre}`.                                                                              |
+| `GET /recetas`                 | `buscar`, `categoria_id`, `subcategoria_id`, `ingredientes[]`, `page`, `per_page` | 200: catálogo paginado.                                                                                                 |
+| `GET /recetas/aleatorias`      | —                                                                                 | 200: hasta 10 recetas publicadas aleatorias en `data`.                                                                  |
+| `GET /recetas/{receta}`        | ID canónico                                                                       | 200: detalle en `data`.                                                                                                 |
+| `GET /recetas/{receta}/imagen` | ID canónico                                                                       | 200: archivo; 404 si la receta o su imagen no están disponibles.                                                        |
 
-El catálogo contiene únicamente recetas publicadas y no eliminadas. Mantiene visibles las publicaciones de autores deshabilitados. Las recetas privadas ajenas, eliminadas e inexistentes no se distinguen mediante la consulta pública de detalle.
+El catálogo contiene únicamente recetas publicadas y no eliminadas. Mantiene visibles las publicaciones de autores deshabilitados y las recetas históricas publicadas sin clasificación (`categoria: null`, `subcategoria: null`). Las recetas privadas ajenas, eliminadas e inexistentes no se distinguen mediante la consulta pública de detalle.
 
 Los listados de ingredientes, recetas, favoritos, recetas propias y solicitudes propias utilizan `page` desde 1 y `per_page` entre 1 y 50, con 15 por defecto. La página tiene además un límite técnico para evitar desbordamientos: `intdiv(PHP_INT_MAX, 50)`. Valores inválidos producen 422. Categorías es la excepción: no está paginada. Los listados paginados devuelven `data`, `links` y `meta`; `meta` incluye `current_page`, `last_page`, `per_page`, `from`, `to` y `total`. Una página sin resultados devuelve una lista vacía.
 
-`buscar` admite hasta 100 caracteres. La búsqueda es por nombre. `categoria_id` debe existir. `ingredientes` es una lista de hasta 50 IDs existentes, sin duplicados; una lista vacía no activa el filtro.
+`buscar` admite hasta 100 caracteres. La búsqueda es por nombre. `categoria_id` y `subcategoria_id` deben ser identificadores enteros canónicos existentes; si se envían ambos, `subcategoria_id` debe pertenecer a `categoria_id` (de lo contrario responde 422 en `subcategoria_id`). El filtro por `categoria_id` devuelve todas las recetas publicadas de esa categoría; `subcategoria_id` es opcional y reduce los resultados. Las recetas históricas sin clasificación siguen apareciendo en el listado general, en `GET /recetas/aleatorias` y en el detalle, pero no coinciden cuando se filtra por `categoria_id` o `subcategoria_id`. `ingredientes` es una lista de hasta 50 IDs existentes, sin duplicados; una lista vacía no activa el filtro.
+
+Ejemplo de respuesta de `GET /api/v1/categorias`:
+
+```json
+{
+    "data": [
+        {
+            "id": 1,
+            "nombre": "Comidas",
+            "subcategorias": [
+                { "id": 10, "nombre": "Arroces" },
+                { "id": 11, "nombre": "Sopas" }
+            ]
+        }
+    ]
+}
+```
 
 Ejemplo de búsqueda:
 
 ```text
-GET /api/v1/recetas?ingredientes[]=1&ingredientes[]=2&per_page=15&page=1
+GET /api/v1/recetas?categoria_id=1&subcategoria_id=10&ingredientes[]=1&ingredientes[]=2&per_page=15&page=1
 ```
 
 Con ingredientes seleccionados se exige al menos una coincidencia, se ordena primero por menor cantidad de ingredientes faltantes y después por publicación e ID descendentes. No se comparan cantidades. Cada resultado incorpora `ingredientes_disponibles`, `ingredientes_faltantes`, `cantidad_coincidencias` y `cantidad_faltantes`. Esta selección no se guarda como inventario.
 
 ### Recursos de receta
 
-El catálogo devuelve `id`, `nombre`, `descripcion`, `imagen_url`, `porciones`, `tiempo_preparacion`, `categorias`, `valoracion_promedio` nullable, `cantidad_valoraciones`, `ingredientes_resumen` de hasta tres elementos y `cantidad_ingredientes`.
+El catálogo (`GET /recetas` y `GET /recetas/aleatorias`) devuelve `id`, `nombre`, `descripcion`, `imagen_url`, `porciones`, `tiempo_preparacion`, `categoria` (`{id, nombre}` o `null`), `subcategoria` (`{id, nombre}` o `null`), `valoracion_promedio` nullable, `cantidad_valoraciones`, `ingredientes_resumen` de hasta tres elementos y `cantidad_ingredientes`.
 
 El detalle añade `tips` nullable, `ingredientes` y `pasos`. Un ingrediente contiene `ingrediente_id`, `nombre`, `cantidad` nullable, `unidad` nullable, `notas` nullable y `orden`. Un paso contiene `orden` e `instruccion`. El detalle público no expone rutas internas de archivos ni información privada del autor.
 
@@ -140,7 +159,8 @@ Ejemplo del objeto de contenido. Para crear una receta, enviar estos campos al n
     "porciones": 2,
     "tiempo_preparacion": 25,
     "tips": null,
-    "categorias": [1],
+    "categoria_id": 1,
+    "subcategoria_id": 10,
     "ingredientes": [
         {
             "ingrediente_id": 1,
@@ -154,20 +174,20 @@ Ejemplo del objeto de contenido. Para crear una receta, enviar estos campos al n
 }
 ```
 
-| Campo                             | Regla                                                                                             |
-| --------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `nombre`                          | Obligatorio, texto, hasta 150 caracteres.                                                         |
-| `descripcion`                     | Obligatoria, texto, hasta 16000 caracteres.                                                       |
-| `porciones`, `tiempo_preparacion` | Enteros entre 1 y 65535.                                                                          |
-| `tips`                            | Opcional/nullable, hasta 16000 caracteres.                                                        |
-| `categorias`                      | Lista de 1 a 100 IDs existentes y distintos.                                                      |
-| `ingredientes`                    | Lista de 1 a 500 objetos; IDs existentes sin repetir.                                             |
-| `cantidad`                        | Campo presente, nullable; si contiene número, mayor que cero, hasta 9999999.999 y tres decimales. |
-| `unidad`, `notas`                 | Campos presentes y nullables; hasta 50 y 16000 caracteres, respectivamente.                       |
-| `orden`                           | Entero entre 1 y 65535, distinto dentro de cada lista.                                            |
-| `pasos`                           | Lista de 1 a 500 objetos; instrucción obligatoria de hasta 16000 caracteres.                      |
+| Campo                              | Regla                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `nombre`                           | Obligatorio, texto, hasta 150 caracteres.                                                              |
+| `descripcion`                      | Obligatoria, texto, hasta 16000 caracteres.                                                            |
+| `porciones`, `tiempo_preparacion`  | Enteros entre 1 y 65535.                                                                               |
+| `tips`                             | Opcional/nullable, hasta 16000 caracteres.                                                             |
+| `categoria_id`, `subcategoria_id`  | Obligatorios, IDs enteros positivos canónicos existentes; `subcategoria_id` debe pertenecer a `categoria_id`. |
+| `ingredientes`                     | Lista de 1 a 500 objetos; IDs existentes sin repetir.                                                  |
+| `cantidad`                         | Campo presente, nullable; si contiene número, mayor que cero, hasta 9999999.999 y tres decimales.      |
+| `unidad`, `notas`                  | Campos presentes y nullables; hasta 50 y 16000 caracteres, respectivamente.                            |
+| `orden`                            | Entero entre 1 y 65535, distinto dentro de cada lista.                                                 |
+| `pasos`                            | Lista de 1 a 500 objetos; instrucción obligatoria de hasta 16000 caracteres.                           |
 
-Las listas deben tener índices consecutivos desde cero. La corrección admite solamente los campos documentados en `contenido`; los objetos de ingredientes y pasos también tienen campos cerrados. En formularios multipart, `categorias`, `ingredientes` y `pasos` pueden enviarse como cadenas JSON. `contenido` también puede ser una cadena JSON válida en la corrección.
+Las listas deben tener índices consecutivos desde cero. La corrección admite solamente los campos documentados en `contenido`; los objetos de ingredientes y pasos también tienen campos cerrados. En formularios multipart, `ingredientes` y `pasos` pueden enviarse como cadenas JSON (`categoria_id` y `subcategoria_id` se envían como campos escalares enteros o cadenas numéricas canónicas). `contenido` también puede ser una cadena JSON válida en la corrección.
 
 ### Imágenes
 
@@ -177,7 +197,7 @@ Para corregir texto desde otro dispositivo basta consultar el detalle y **omitir
 
 Si se cambia la imagen de una publicada: subir primero a `POST /mis-recetas/{id}/imagen` y usar el valor `imagen` devuelto en `contenido.imagen`. La subida no cambia la imagen pública de una receta publicada; la propuesta debe pasar por revisión. No se admiten referencias de otra receta, URLs externas ni rutas arbitrarias. Con una privada, esa subida establece su imagen vigente. La subida se rechaza si la receta está eliminada o tiene solicitud pendiente.
 
-El detalle de solicitud entrega `contenido.imagen_url`, que permite leer la imagen propuesta. Al reconstruir un formulario desde un detalle, convertir `categorias` enriquecidas a su lista de IDs y quitar los campos de lectura, como `nombre` del ingrediente e `imagen_url`. Omitir imagen conserva la vigente de la receta, no necesariamente una imagen distinta de una propuesta rechazada. La API de detalle de solicitud no devuelve una referencia interna reutilizable para esa imagen rechazada.
+El detalle de solicitud entrega `contenido.imagen_url`, que permite leer la imagen propuesta. Al reconstruir un formulario desde un detalle, convertir `categoria` y `subcategoria` enriquecidas a `categoria_id` y `subcategoria_id` y quitar los campos de lectura, como `nombre` del ingrediente e `imagen_url`. Omitir imagen conserva la vigente de la receta, no necesariamente una imagen distinta de una propuesta rechazada. La API de detalle de solicitud no devuelve una referencia interna reutilizable para esa imagen rechazada.
 
 ## 6. Publicaciones, correcciones e idempotencia
 
@@ -215,7 +235,7 @@ La creación de una receta privada y las subidas de archivo no ofrecen idempoten
 | `GET /mis-solicitudes/{solicitud}/imagen`    | —                                                                                                                              | Imagen propuesta autorizada. |
 | `POST /mis-solicitudes/{solicitud}/cancelar` | Sin cuerpo                                                                                                                     | `mensaje`, `solicitud`.      |
 
-El resumen contiene `id`, `receta_id`, `receta_nombre`, `tipo`, `estado`, `version_base`, `clave_idempotencia`, `created_at`, `revisada_en`, `cancelada_en` y `motivo_rechazo`. El detalle añade `contenido`, con categorías e ingredientes enriquecidos con nombres y la URL autenticada de imagen. No expone datos privados del revisor.
+El resumen contiene `id`, `receta_id`, `receta_nombre`, `tipo`, `estado`, `version_base`, `clave_idempotencia`, `created_at`, `revisada_en`, `cancelada_en` y `motivo_rechazo`. El detalle añade `contenido`, con `categoria` (`{id, nombre}` o `null`), `subcategoria` (`{id, nombre}` o `null`), `ingredientes` enriquecidos con nombres y la URL autenticada de imagen. No expone datos privados del revisor.
 
 Se cancela una solicitud pendiente; repetir su cancelación tiene éxito sin repetir efectos. No se cancela una aprobada ni una rechazada. Cancelar una publicación deja la receta privada; cancelar una corrección conserva la receta publicada.
 
@@ -341,7 +361,9 @@ La migración incremental `2026_09_13_204720_create_operaciones_receta_table.php
 
 La migración `2026_09_13_210516_fijar_expiracion_codigo_recuperacion.php` elimina la actualización automática accidental de `codigo_expira_en` detectada en MariaDB 10.4. Sin ella, guardar un intento fallido podía cambiar la expiración y vencer el código antes de los cinco intentos previstos. Conserva el tipo TIMESTAMP y los valores existentes, con un valor predeterminado explícito que impide el `ON UPDATE` implícito. No reconstruye expiraciones que ya se hayan modificado anteriormente. Se comprobó la conservación de registros previos en una base aislada; tampoco se aplicó a la base real.
 
-Antes de instalar estas migraciones en la base real debe revisarse el destino y obtener autorización. `php artisan migrate:status` permite inspeccionar el estado. Aplicarlas corresponde a una operación de despliegue posterior; no ejecutar `migrate:fresh` ni `db:wipe`. Revertir la migración de operaciones elimina el historial de idempotencia; revertir la de expiración vuelve al comportamiento anterior. Ninguna reversión es una forma inocua de deshacer operaciones de recetas.
+La migración `2026_10_21_021016_transicion_categorias_y_subcategorias_en_recetas.php` crea la tabla `subcategorias` (con restricción compuesta `(categoria_id, id)` y unicidad `(categoria_id, nombre)`), incorpora las columnas `categoria_id` y `subcategoria_id` en `recetas` (con clave foránea compuesta `(categoria_id, subcategoria_id) -> subcategorias(categoria_id, id)` con `RESTRICT` al eliminar), y ejecuta la transición única que retira el pivote `categoria_receta` y vacía el catálogo previo de `categorias`, conservando intactas todas las recetas existentes con `categoria_id = null` y `subcategoria_id = null`. Tampoco se aplicó a la base real durante su implementación.
+
+Antes de instalar estas migraciones en la base real debe revisarse el destino y obtener autorización. `php artisan migrate:status` permite inspeccionar el estado. Aplicarlas corresponde a una operación de despliegue posterior; no ejecutar `migrate:fresh` ni `db:wipe`. Revertir la migración de operaciones elimina el historial de idempotencia; revertir la de expiración vuelve al comportamiento anterior; revertir la de categorías y subcategorías recrea `categoria_receta` y elimina `subcategorias` sin restaurar las categorías fijas retiradas. Ninguna reversión es una forma inocua de deshacer operaciones de recetas.
 
 ## 13. Alcance pendiente y comprobación
 
