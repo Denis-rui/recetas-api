@@ -84,4 +84,22 @@ class RecetaPolicy
             && $receta->creado_por === $user->id
             && ! $receta->trashed();
     }
+
+    /**
+     * Determina si el administrador activo puede acceder al listado administrativo de recetas publicadas.
+     */
+    public function administrarListado(User $user): bool
+    {
+        return $user->esAdministrador() && $user->estaActivo();
+    }
+
+    /**
+     * Determina si el administrador activo puede ver o editar administrativamente una receta publicada y vigente.
+     */
+    public function administrar(User $user, Receta $receta): bool
+    {
+        return $user->esAdministrador()
+            && $user->estaActivo()
+            && $receta->estaPublicada();
+    }
 }

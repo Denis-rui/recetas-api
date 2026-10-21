@@ -7,6 +7,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Models\Valoracion;
 use Illuminate\Database\Seeder;
@@ -30,6 +31,10 @@ class RevisionRecetasDemoSeeder extends Seeder
             $deshabilitado = $this->cuenta('deshabilitado', 'Autor deshabilitado demo', 'usuario', false);
             $lector = $this->cuenta('lector', 'Lector demo', 'usuario');
             $categoria = Categoria::firstOrCreate(['nombre' => 'Comidas']);
+            $subcategoria = Subcategoria::firstOrCreate([
+                'categoria_id' => $categoria->id,
+                'nombre' => 'Platos de fondo',
+            ]);
             $arroz = Ingrediente::firstOrCreate(['nombre' => 'Arroz']);
             $zanahoria = Ingrediente::firstOrCreate(['nombre' => 'Zanahoria']);
             $casos = [
@@ -47,6 +52,8 @@ class RevisionRecetasDemoSeeder extends Seeder
                 }
                 $receta = Receta::factory()->create([
                     'nombre' => '[DEMO] '.$nombre, 'creado_por' => $cuenta->id,
+                    'categoria_id' => $categoria->id,
+                    'subcategoria_id' => $subcategoria->id,
                     'publicada_en' => $tipo === 'correccion' ? now()->subDays(7) : null,
                     'descripcion' => 'Una receta sencilla de arroz con verduras para compartir.',
                     'tips' => 'Lava el arroz antes de cocinar.',
@@ -56,7 +63,6 @@ class RevisionRecetasDemoSeeder extends Seeder
                     throw new RuntimeException('No se pudo guardar la imagen privada de demostración.');
                 }
                 $receta->update(['imagen' => $imagen]);
-                $receta->categorias()->attach($categoria->id);
                 $receta->ingredientes()->attach([
                     $arroz->id => ['cantidad' => 1, 'unidad' => 'taza', 'notas' => 'Lavado', 'orden' => 1],
                     $zanahoria->id => ['cantidad' => 1, 'unidad' => 'unidad', 'notas' => 'En cubos', 'orden' => 2],
@@ -70,7 +76,8 @@ class RevisionRecetasDemoSeeder extends Seeder
                     'descripcion' => 'Arroz con verduras frescas, listo para compartir en casa.',
                     'imagen' => $imagen, 'porciones' => 3, 'tiempo_preparacion' => 30,
                     'tips' => $tipo === 'correccion' ? 'Deja reposar cinco minutos antes de servir.' : null,
-                    'categorias' => [$categoria->id],
+                    'categoria_id' => $categoria->id,
+                    'subcategoria_id' => $subcategoria->id,
                     'ingredientes' => [
                         ['ingrediente_id' => $zanahoria->id, 'cantidad' => 2, 'unidad' => 'unidades', 'notas' => 'Cortadas en cubos pequeños', 'orden' => 1],
                         ['ingrediente_id' => $arroz->id, 'cantidad' => 1.5, 'unidad' => 'tazas', 'notas' => 'Lavado', 'orden' => 2],

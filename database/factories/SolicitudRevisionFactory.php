@@ -6,6 +6,7 @@ use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
 use App\Models\SolicitudRevision;
+use App\Models\Subcategoria;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -20,14 +21,21 @@ class SolicitudRevisionFactory extends Factory
             'tipo' => 'publicacion', 'estado' => 'pendiente',
             'version_base' => fn (array $datos) => Receta::withTrashed()->findOrFail($datos['receta_id'])->version,
             'clave_idempotencia' => fn () => (string) Str::uuid(),
-            'contenido' => fn (array $datos) => [
-                'nombre' => 'Arroz con verduras mejorado', 'descripcion' => 'Una preparación casera y sencilla.',
-                'imagen' => 'recetas/'.$datos['receta_id'].'/demo.png',
-                'porciones' => 3, 'tiempo_preparacion' => 30, 'tips' => 'Dejar reposar cinco minutos.',
-                'categorias' => [Categoria::factory()->create()->id],
-                'ingredientes' => [['ingrediente_id' => Ingrediente::factory()->create()->id, 'cantidad' => '1.500', 'unidad' => 'tazas', 'notas' => 'Lavado', 'orden' => 1]],
-                'pasos' => [['orden' => 1, 'instruccion' => 'Cocinar a fuego lento.']],
-            ],
+            'contenido' => function (array $datos): array {
+                $receta = Receta::withTrashed()->find($datos['receta_id']);
+                $categoriaId = $receta?->categoria_id ?? Categoria::factory()->create()->id;
+                $subcategoriaId = $receta?->subcategoria_id ?? Subcategoria::factory()->create(['categoria_id' => $categoriaId])->id;
+
+                return [
+                    'nombre' => 'Arroz con verduras mejorado', 'descripcion' => 'Una preparación casera y sencilla.',
+                    'imagen' => 'recetas/'.$datos['receta_id'].'/demo.png',
+                    'porciones' => 3, 'tiempo_preparacion' => 30, 'tips' => 'Dejar reposar cinco minutos.',
+                    'categoria_id' => $categoriaId,
+                    'subcategoria_id' => $subcategoriaId,
+                    'ingredientes' => [['ingrediente_id' => Ingrediente::factory()->create()->id, 'cantidad' => '1.500', 'unidad' => 'tazas', 'notas' => 'Lavado', 'orden' => 1]],
+                    'pasos' => [['orden' => 1, 'instruccion' => 'Cocinar a fuego lento.']],
+                ];
+            },
         ];
     }
 

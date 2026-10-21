@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use InvalidArgumentException;
 
 #[Fillable([
     'nombre',
@@ -18,6 +19,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'porciones',
     'tiempo_preparacion',
     'tips',
+    'categoria_id',
+    'subcategoria_id',
 ])]
 class Receta extends Model
 {
@@ -26,14 +29,62 @@ class Receta extends Model
 
     protected $table = 'recetas';
 
+    protected bool $permiteSinClasificacionHistorica = false;
+
     protected function casts(): array
     {
         return [
             'porciones' => 'integer',
             'tiempo_preparacion' => 'integer',
+            'categoria_id' => 'integer',
+            'subcategoria_id' => 'integer',
             'publicada_en' => 'datetime',
             'version' => 'integer',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (Receta $receta): void {
+            $tieneCategoria = $receta->categoria_id !== null;
+            $tieneSubcategoria = $receta->subcategoria_id !== null;
+
+            if (! $tieneCategoria && ! $tieneSubcategoria) {
+                $esHistoricaPublicadaSinClasificacion = ($receta->permiteSinClasificacionHistorica && $receta->publicada_en !== null)
+                    || (
+                        $receta->exists
+                        && $receta->getOriginal('categoria_id') === null
+                        && $receta->getOriginal('subcategoria_id') === null
+                        && ($receta->publicada_en !== null || $receta->getOriginal('publicada_en') !== null)
+                    );
+
+                if (! $esHistoricaPublicadaSinClasificacion) {
+                    throw new InvalidArgumentException('Toda receta nueva requiere una categoría y una subcategoría.');
+                }
+
+                return;
+            }
+
+            if (! $tieneCategoria || ! $tieneSubcategoria) {
+                throw new InvalidArgumentException('La receta debe tener tanto categoría como subcategoría.');
+            }
+
+            $perteneceACategoria = Subcategoria::query()
+                ->whereKey($receta->subcategoria_id)
+                ->where('categoria_id', $receta->categoria_id)
+                ->exists();
+
+            if (! $perteneceACategoria) {
+                throw new InvalidArgumentException('La subcategoría seleccionada no pertenece a la categoría de la receta.');
+            }
+        });
+    }
+
+    public function permitirSinClasificacionHistorica(bool $permitir = true): static
+    {
+        $this->permiteSinClasificacionHistorica = $permitir;
+
+        return $this;
     }
 
     /**
@@ -48,6 +99,16 @@ class Receta extends Model
     public function estaPublicada(): bool
     {
         return $this->publicada_en !== null && ! $this->trashed();
+    }
+
+    public function categoria(): BelongsTo
+    {
+        return $this->belongsTo(Categoria::class, 'categoria_id');
+    }
+
+    public function subcategoria(): BelongsTo
+    {
+        return $this->belongsTo(Subcategoria::class, 'subcategoria_id');
     }
 
     public function creador(): BelongsTo
@@ -71,16 +132,6 @@ class Receta extends Model
             ->withPivot(['cantidad', 'unidad', 'notas', 'orden'])
             ->withTimestamps()
             ->orderByPivot('orden');
-    }
-
-    public function categorias(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            Categoria::class,
-            'categoria_receta',
-            'receta_id',
-            'categoria_id',
-        )->withTimestamps();
     }
 
     public function pasos(): HasMany

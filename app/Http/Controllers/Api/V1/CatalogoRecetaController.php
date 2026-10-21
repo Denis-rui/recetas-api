@@ -25,7 +25,8 @@ class CatalogoRecetaController extends Controller
             ->withCount('valoraciones as cantidad_valoraciones')
             ->withCount('ingredientes as cantidad_ingredientes')
             ->with([
-                'categorias:id,nombre',
+                'categoria:id,nombre',
+                'subcategoria:id,nombre',
                 'ingredientes' => fn ($subQuery) => $subQuery
                     ->select('ingredientes.id', 'ingredientes.nombre')
                     ->withPivot(['orden'])
@@ -41,7 +42,12 @@ class CatalogoRecetaController extends Controller
 
         $categoriaId = $request->validated('categoria_id');
         if ($categoriaId !== null) {
-            $query->whereHas('categorias', fn ($subQuery) => $subQuery->where('categorias.id', $categoriaId));
+            $query->where('categoria_id', (int) $categoriaId);
+        }
+
+        $subcategoriaId = $request->validated('subcategoria_id');
+        if ($subcategoriaId !== null) {
+            $query->where('subcategoria_id', (int) $subcategoriaId);
         }
 
         $ingredientesSeleccionados = array_map('intval', $request->validated('ingredientes', []));
@@ -83,7 +89,8 @@ class CatalogoRecetaController extends Controller
             ->withCount('valoraciones as cantidad_valoraciones')
             ->withCount('ingredientes as cantidad_ingredientes')
             ->with([
-                'categorias:id,nombre',
+                'categoria:id,nombre',
+                'subcategoria:id,nombre',
                 'ingredientes' => fn ($subQuery) => $subQuery
                     ->select('ingredientes.id', 'ingredientes.nombre')
                     ->withPivot(['orden'])
@@ -110,7 +117,8 @@ class CatalogoRecetaController extends Controller
             ->withCount('valoraciones as cantidad_valoraciones')
             ->withCount('ingredientes as cantidad_ingredientes')
             ->with([
-                'categorias:id,nombre',
+                'categoria:id,nombre',
+                'subcategoria:id,nombre',
                 'ingredientes' => fn ($subQuery) => $subQuery
                     ->select('ingredientes.id', 'ingredientes.nombre')
                     ->withPivot(['cantidad', 'unidad', 'notas', 'orden'])

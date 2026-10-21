@@ -5,6 +5,7 @@ namespace Tests\Feature\Api;
 use App\Models\Categoria;
 use App\Models\Ingrediente;
 use App\Models\Receta;
+use App\Models\Subcategoria;
 use App\Models\User;
 use App\Models\Valoracion;
 use Illuminate\Support\Facades\DB;
@@ -21,18 +22,25 @@ beforeEach(function () {
     $this->token = $this->usuario->createToken('Movil')->plainTextToken;
 
     $this->categoria = Categoria::factory()->create(['nombre' => 'Comidas']);
+    $this->subcategoria = Subcategoria::factory()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Marinos']);
     $this->ingrediente = Ingrediente::factory()->create(['nombre' => 'Pescado']);
 });
 
 function crearRecetaPublicaFavoritos(string $nombre = 'Ceviche Mixto'): Receta
 {
     $autor = User::factory()->create(['rol' => 'usuario', 'activo' => true]);
+    $cat = Categoria::first() ?? Categoria::factory()->create();
+    $sub = Subcategoria::where('categoria_id', $cat->id)->first() ?? Subcategoria::factory()->create(['categoria_id' => $cat->id]);
+    $ing = Ingrediente::first() ?? Ingrediente::factory()->create();
+
     $receta = Receta::factory()->publicada()->create([
         'creado_por' => $autor->id,
         'nombre' => $nombre,
         'descripcion' => 'Ceviche fresco con ají limo.',
         'porciones' => 3,
         'tiempo_preparacion' => 20,
+        'categoria_id' => $cat->id,
+        'subcategoria_id' => $sub->id,
         'imagen' => 'recetas/1/demo.png',
         'version' => 1,
     ]);
@@ -41,10 +49,6 @@ function crearRecetaPublicaFavoritos(string $nombre = 'Ceviche Mixto'): Receta
 
     Storage::disk('local')->put($receta->imagen, base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a8V8AAAAASUVORK5CYII='));
 
-    $cat = Categoria::first() ?? Categoria::factory()->create();
-    $ing = Ingrediente::first() ?? Ingrediente::factory()->create();
-
-    $receta->categorias()->attach($cat->id);
     $receta->ingredientes()->attach($ing->id, ['cantidad' => 400, 'unidad' => 'gramos', 'notas' => 'Fresco', 'orden' => 1]);
     $receta->pasos()->create(['orden' => 1, 'instruccion' => 'Cortar pescado y mezclar con limón.']);
 

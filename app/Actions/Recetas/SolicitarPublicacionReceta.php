@@ -84,7 +84,7 @@ class SolicitarPublicacionReceta
 
                 return [
                     'tipo' => 'directa',
-                    'receta' => $receta->fresh(['categorias', 'ingredientes', 'pasos']),
+                    'receta' => $receta->fresh(['categoria:id,nombre', 'subcategoria:id,nombre', 'ingredientes', 'pasos']),
                 ];
             }
 

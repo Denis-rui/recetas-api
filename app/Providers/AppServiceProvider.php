@@ -82,6 +82,23 @@ class AppServiceProvider extends ServiceProvider
                 });
         });
 
+        RateLimiter::for('listado-recetas', function (Request $request) {
+            if (! $request->ajax()) {
+                return Limit::none();
+            }
+
+            $usuarioId = $request->user()?->id;
+
+            return Limit::perMinute(max(1, (int) config('recetas.rate_limit', 60)))
+                ->by($usuarioId ? 'admin_'.$usuarioId : 'ip_'.$request->ip())
+                ->response(function (Request $request, array $headers) {
+                    return response()->json([
+                        'message' => 'Has superado el límite de consultas permitidas. Por favor, espera antes de reintentar.',
+                        'retry_after' => (int) ($headers['Retry-After'] ?? 60),
+                    ], 429, $headers);
+                });
+        });
+
         RateLimiter::for('api-login', function (Request $request) {
             $email = strtolower(trim((string) $request->input('email')));
             $ip = (string) $request->ip();

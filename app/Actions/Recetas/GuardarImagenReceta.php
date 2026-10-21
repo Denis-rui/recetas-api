@@ -4,6 +4,7 @@ namespace App\Actions\Recetas;
 
 use App\Models\Receta;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -54,8 +55,25 @@ class GuardarImagenReceta
         }
 
         // --- NUEVA LÓGICA DE CONVERSIÓN CON INTERVENTION v4 ---
-        $nombreArchivo = Str::random(40).'.webp';
         $directorio = 'recetas/'.$recetaId;
+
+        if (! extension_loaded('gd')) {
+            $nombreSinGd = Str::random(40).'.'.$extension;
+            $rutaSinGd = $archivo->storeAs($directorio, $nombreSinGd, 'local');
+
+            if (! $rutaSinGd || ! Storage::disk('local')->exists($rutaSinGd)) {
+                throw ValidationException::withMessages([
+                    'imagen' => 'No se pudo guardar la imagen en el almacenamiento del servidor.',
+                ]);
+            }
+
+            return [
+                'ruta' => $rutaSinGd,
+                'mime' => $mimeReal,
+            ];
+        }
+
+        $nombreArchivo = Str::random(40).'.webp';
         $rutaAlmacenada = $directorio.'/'.$nombreArchivo;
 
         try {
@@ -72,7 +90,7 @@ class GuardarImagenReceta
             Storage::disk('local')->put($rutaAlmacenada, $imagenOptimizada->toString());
 
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::error('Error optimizando imagen: ' . $e->getMessage(), ['trace' => $e->getTraceAsString()]);
+            Log::error('Error optimizando imagen: '.$e->getMessage(), ['trace' => $e->getTraceAsString()]);
             throw ValidationException::withMessages([
                 'imagen' => 'Ocurrió un error al procesar y optimizar la imagen.',
             ]);

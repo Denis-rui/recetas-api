@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable(['nombre'])]
 class Categoria extends Model
@@ -14,13 +14,19 @@ class Categoria extends Model
 
     protected $table = 'categorias';
 
-    public function recetas(): BelongsToMany
+    public function subcategorias(): HasMany
     {
-        return $this->belongsToMany(
-            Receta::class,
-            'categoria_receta',
-            'categoria_id',
-            'receta_id',
-        )->withTimestamps();
+        return $this->hasMany(Subcategoria::class, 'categoria_id');
+    }
+
+    public function recetas(): HasMany
+    {
+        return $this->hasMany(Receta::class, 'categoria_id');
+    }
+
+    public function tieneRecetasAsociadas(): bool
+    {
+        return $this->recetas()->withTrashed()->exists()
+            || Receta::withTrashed()->whereIn('subcategoria_id', $this->subcategorias()->select('id'))->exists();
     }
 }
