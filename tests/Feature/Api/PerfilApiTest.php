@@ -173,7 +173,7 @@ test('descarga de foto de perfil requiere autenticacion activa', function () {
     $this->getJson('/api/v1/perfil/foto')->assertUnauthorized();
 });
 
-test('subida de foto rechaza formatos no permitidos y tamano mayor a 2mb', function () {
+test('subida de foto acepta archivos de hasta 10mb y rechaza formatos no permitidos o tamano mayor a 10mb', function () {
     $archivoPdf = UploadedFile::fake()->create('documento.pdf', 500, 'application/pdf');
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
@@ -183,7 +183,15 @@ test('subida de foto rechaza formatos no permitidos y tamano mayor a 2mb', funct
         ->assertStatus(422)
         ->assertJsonValidationErrors(['foto_perfil']);
 
-    $archivoPesado = UploadedFile::fake()->create('pesada.jpg', 3000, 'image/jpeg');
+    $foto5Mb = UploadedFile::fake()->create('camara_movil.jpg', 5120, 'image/jpeg');
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson('/api/v1/perfil/foto', [
+            'foto_perfil' => $foto5Mb,
+        ])
+        ->assertOk();
+
+    $archivoPesado = UploadedFile::fake()->create('pesada.jpg', 10241, 'image/jpeg');
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson('/api/v1/perfil/foto', [

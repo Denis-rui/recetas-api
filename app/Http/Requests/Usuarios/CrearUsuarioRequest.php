@@ -24,7 +24,7 @@ class CrearUsuarioRequest extends FormRequest
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:12', 'confirmed'],
             'rol' => ['required', Rule::in(['administrador', 'usuario'])],
-            'foto_perfil' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'foto_perfil' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:10240'],
         ];
     }
 
@@ -43,7 +43,7 @@ class CrearUsuarioRequest extends FormRequest
             'rol.in' => 'El rol seleccionado no es válido.',
             'foto_perfil.image' => 'El archivo debe ser una imagen.',
             'foto_perfil.mimes' => 'La foto de perfil debe estar en formato JPEG, PNG, JPG o WEBP.',
-            'foto_perfil.max' => 'La foto de perfil no debe superar los 2 MB de tamaño.',
+            'foto_perfil.max' => 'La foto de perfil no debe superar los 10 MB de tamaño.',
         ];
     }
 }

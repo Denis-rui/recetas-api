@@ -34,9 +34,9 @@ class GuardarImagenReceta
             ]);
         }
 
-        if ($archivo->getSize() > 2048 * 1024) {
+        if ($archivo->getSize() > 10240 * 1024) {
             throw ValidationException::withMessages([
-                'imagen' => 'La imagen supera el tamaño máximo permitido de 2 MB.',
+                'imagen' => 'La imagen supera el tamaño máximo permitido de 10 MB.',
             ]);
         }
 

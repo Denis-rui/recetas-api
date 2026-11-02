@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class ActualizarPerfil
 {
+    public function __construct(public GuardarFotoPerfil $guardarFotoPerfil) {}
+
     /**
      * Actualiza los datos personales del propio administrador.
      * Garantiza que rol y estado permanezcan inalterables (RF-10, RN-07).
@@ -24,7 +26,9 @@ class ActualizarPerfil
 
         if ($foto !== null) {
             try {
-                $nuevaFoto = $foto->store('perfiles', 'public');
+                $nuevaFoto = $this->guardarFotoPerfil->ejecutar($foto);
+            } catch (ValidationException $e) {
+                throw $e;
             } catch (\Throwable $e) {
                 Log::error('Fallo al almacenar la nueva fotografía de perfil: '.$e->getMessage());
 

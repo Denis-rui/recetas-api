@@ -128,7 +128,7 @@
                        id="foto_perfil" 
                        accept="image/png, image/jpeg, image/jpg, image/webp"
                        class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-amber-50 file:text-amber-700 hover:file:bg-amber-100 transition">
-                <p class="text-xs text-slate-400 mt-1">Formatos permitidos: JPG, PNG o WEBP. Máximo 2 MB. Si no se sube foto, se mostrarán las iniciales.</p>
+                <p class="text-xs text-slate-400 mt-1">Formatos permitidos: JPG, PNG o WEBP. Máximo 10 MB. Si no se sube foto, se mostrarán las iniciales.</p>
             </div>
 
             <!-- Botones -->

@@ -17,7 +17,7 @@ class SubirImagenRecetaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'imagen' => ['required', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'imagen' => ['required', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:10240'],
         ];
     }
 
@@ -31,7 +31,7 @@ class SubirImagenRecetaRequest extends FormRequest
             'imagen.file' => 'El campo debe ser un archivo válido.',
             'imagen.image' => 'El archivo adjunto debe ser una imagen.',
             'imagen.mimes' => 'La imagen debe ser de tipo JPG, JPEG, PNG o WEBP.',
-            'imagen.max' => 'La imagen no debe superar los 2 MB de tamaño.',
+            'imagen.max' => 'La imagen no debe superar los 10 MB de tamaño.',
         ];
     }
 }

@@ -10,7 +10,7 @@ class ActualizarRecetaRequest extends GuardarRecetaRequest
     public function rules(): array
     {
         $reglaImagen = $this->hasFile('imagen')
-            ? ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048']
+            ? ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:10240']
             : ['nullable', 'string', 'max:2048'];
 
         return [

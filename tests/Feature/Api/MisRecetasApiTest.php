@@ -481,6 +481,15 @@ test('subida de imagen aislada en endpoint dedicado valida tipo y tamano', funct
         ])
         ->assertUnprocessable();
 
+    // Archivo que supera los 10 MB (10240 KB) es rechazado
+    $archivoMayorA10Mb = UploadedFile::fake()->create('excesiva.jpg', 10241, 'image/jpeg');
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->post("/api/v1/mis-recetas/{$receta->id}/imagen", [
+            'imagen' => $archivoMayorA10Mb,
+        ], ['Accept' => 'application/json'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('imagen');
+
     // Archivo de imagen válido
     $imagenOk = fakePngUpload('nueva_foto.png');
     $response = $this->withHeader('Authorization', 'Bearer '.$this->token)

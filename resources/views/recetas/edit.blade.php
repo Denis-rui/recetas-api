@@ -249,7 +249,7 @@
                         class="block w-full text-sm text-slate-700 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-50 file:text-amber-800 hover:file:bg-amber-100"
                     >
                     <p class="text-xs text-slate-500">
-                        Formatos permitidos: JPG, PNG o WEBP (máximo 2 MB). Si no seleccionas un archivo, se conserva la imagen actual.
+                        Formatos permitidos: JPG, PNG o WEBP (máximo 10 MB). Si no seleccionas un archivo, se conserva la imagen actual.
                     </p>
                 </div>
             </div>

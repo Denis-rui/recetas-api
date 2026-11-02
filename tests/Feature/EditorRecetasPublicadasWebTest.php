@@ -444,3 +444,40 @@ test('revierte todos los cambios si ocurre un fallo al guardar los pasos y reval
     expect(fn () => app(ActualizarRecetaPublicada::class)->ejecutar($admin, $receta, []))
         ->toThrow(AuthorizationException::class);
 });
+
+test('rechaza en el editor web una imagen que supere los 10 MB permitidos', function () {
+    $admin = adminEditorRecetas();
+    $receta = recetaPublicadaConRelaciones();
+
+    $imagenMayorA10Mb = UploadedFile::fake()->create('demasiado_pesada.jpg', 10241, 'image/jpeg');
+
+    $this->actingAs($admin)
+        ->from("/recetas/{$receta->id}/editar")
+        ->put("/recetas/{$receta->id}", [
+            'nombre' => $receta->nombre,
+            'descripcion' => $receta->descripcion,
+            'imagen' => $imagenMayorA10Mb,
+            'porciones' => $receta->porciones,
+            'tiempo_preparacion' => $receta->tiempo_preparacion,
+            'tips' => $receta->tips,
+            'categoria_id' => $receta->categoria_id,
+            'subcategoria_id' => $receta->subcategoria_id,
+            'ingredientes' => [
+                [
+                    'ingrediente_id' => $receta->ingredientes->first()->id,
+                    'cantidad' => 2,
+                    'unidad' => 'tazas',
+                    'notas' => null,
+                    'orden' => 1,
+                ],
+            ],
+            'pasos' => [
+                [
+                    'orden' => 1,
+                    'instruccion' => 'Paso válido',
+                ],
+            ],
+        ])
+        ->assertRedirect("/recetas/{$receta->id}/editar")
+        ->assertSessionHasErrors('imagen');
+});

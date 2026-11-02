@@ -117,7 +117,7 @@ class ActualizarRecetaPublicadaRequest extends FormRequest
     public function rules(): array
     {
         $reglaImagen = $this->hasFile('imagen')
-            ? ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048']
+            ? ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:10240']
             : ['nullable', 'string', 'max:2048'];
 
         return [
@@ -184,7 +184,7 @@ class ActualizarRecetaPublicadaRequest extends FormRequest
             'descripcion.max' => 'La descripción no puede superar los 16000 caracteres.',
             'imagen.image' => 'El archivo seleccionado debe ser una imagen válida.',
             'imagen.mimes' => 'La imagen debe estar en formato JPG, JPEG, PNG o WEBP.',
-            'imagen.max' => 'La imagen no debe superar los 2 MB.',
+            'imagen.max' => 'La imagen no debe superar los 10 MB.',
             'porciones.required' => 'El número de porciones es obligatorio.',
             'porciones.integer' => 'El número de porciones debe ser un entero.',
             'porciones.between' => 'El número de porciones debe estar entre 1 y 65535.',
@@ -208,4 +208,3 @@ class ActualizarRecetaPublicadaRequest extends FormRequest
         ];
     }
 }
-

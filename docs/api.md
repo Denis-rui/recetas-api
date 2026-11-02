@@ -75,7 +75,7 @@ Todas estas rutas requieren autenticación y cuenta activa.
 | `POST /perfil/foto`    | Archivo `foto_perfil`                                                  | `mensaje`, `foto_perfil_url`.                               |
 | `PUT /perfil/password` | `current_password`, `password`, `password_confirmation`                | `mensaje`; revoca también el token que realizó la petición. |
 
-La contraseña nueva debe ser diferente de la actual. La foto admite JPEG/JPG, PNG o WEBP y hasta 2048 KiB. Existe además `GET /api/user`, fuera del prefijo v1, como consulta protegida anterior que devuelve el mismo perfil en `data`.
+La contraseña nueva debe ser diferente de la actual. La foto admite JPEG/JPG, PNG o WEBP y hasta 10240 KiB (10 MB). Existe además `GET /api/user`, fuera del prefijo v1, como consulta protegida anterior que devuelve el mismo perfil en `data`.
 
 ## 4. Catálogo público y paginación
 
@@ -191,7 +191,7 @@ Las listas deben tener índices consecutivos desde cero. La corrección admite s
 
 ### Imágenes
 
-Las imágenes de receta admiten JPEG/JPG, PNG o WEBP y hasta 2048 KiB. Se guardan en almacenamiento privado y se sirven mediante las rutas autorizadas, con `Cache-Control: no-store, private`, `nosniff` y Content-Type comprobado. La URL de lectura no es una referencia aceptada para una escritura.
+Las imágenes de receta admiten JPEG/JPG, PNG o WEBP y hasta 10240 KiB (10 MB). Se guardan en almacenamiento privado y se sirven mediante las rutas autorizadas, con `Cache-Control: no-store, private`, `nosniff` y Content-Type comprobado. La URL de lectura no es una referencia aceptada para una escritura.
 
 Para corregir texto desde otro dispositivo basta consultar el detalle y **omitir `contenido.imagen`**. El servidor conserva la imagen vigente de esa receta bajo bloqueo. Omitirla no equivale a enviar `null` o una cadena vacía: esos valores se rechazan. No es necesario conocer la ruta interna ni volver a subir la foto.
 

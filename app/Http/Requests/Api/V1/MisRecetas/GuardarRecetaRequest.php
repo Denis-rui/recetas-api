@@ -30,7 +30,7 @@ class GuardarRecetaRequest extends FormRequest
     public function rules(): array
     {
         $reglaImagen = $this->hasFile('imagen')
-            ? ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048']
+            ? ['required', 'image', 'mimes:jpeg,png,jpg,webp', 'max:10240']
             : ['required', 'string', 'max:2048'];
 
         return [

@@ -7,6 +7,8 @@ use Illuminate\Http\UploadedFile;
 
 class CrearCuenta
 {
+    public function __construct(public GuardarFotoPerfil $guardarFotoPerfil) {}
+
     /**
      * Ejecuta la creación de una nueva cuenta.
      *
@@ -15,8 +17,8 @@ class CrearCuenta
     public function ejecutar(array $datos, ?UploadedFile $foto = null): User
     {
         if ($foto !== null) {
-            $rutaFoto = $foto->store('perfiles', 'public');
-            $datos['foto_perfil'] = $rutaFoto;
+            $rutaFoto = $this->guardarFotoPerfil->ejecutar($foto);
+            $datos['foto_perfil'] = $rutaFoto ?: null;
         }
 
         // Regla RN-03 y RN-04: Rol por defecto Administrador si no se especifica, y estado Activo.

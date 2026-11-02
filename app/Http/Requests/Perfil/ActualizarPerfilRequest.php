@@ -27,7 +27,7 @@ class ActualizarPerfilRequest extends FormRequest
                 'max:255',
                 Rule::unique('users', 'email')->ignore($this->user()->id),
             ],
-            'foto_perfil' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'foto_perfil' => ['nullable', 'image', 'mimes:jpeg,png,jpg,webp', 'max:10240'],
         ];
     }
 
@@ -41,7 +41,7 @@ class ActualizarPerfilRequest extends FormRequest
             'email.unique' => 'Este correo electrónico ya pertenece a otra cuenta.',
             'foto_perfil.image' => 'El archivo debe ser una imagen.',
             'foto_perfil.mimes' => 'La foto de perfil debe estar en formato JPEG, PNG, JPG o WEBP.',
-            'foto_perfil.max' => 'La foto de perfil no debe superar los 2 MB de tamaño.',
+            'foto_perfil.max' => 'La foto de perfil no debe superar los 10 MB de tamaño.',
         ];
     }
 }

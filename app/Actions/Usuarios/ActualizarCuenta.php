@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class ActualizarCuenta
 {
+    public function __construct(public GuardarFotoPerfil $guardarFotoPerfil) {}
+
     /**
      * Actualiza los datos de una cuenta existente.
      *
@@ -23,7 +25,9 @@ class ActualizarCuenta
 
         if ($foto !== null) {
             try {
-                $nuevaFoto = $foto->store('perfiles', 'public');
+                $nuevaFoto = $this->guardarFotoPerfil->ejecutar($foto);
+            } catch (ValidationException $e) {
+                throw $e;
             } catch (\Throwable $e) {
                 Log::error('Fallo al almacenar la nueva fotografía de la cuenta: '.$e->getMessage());
 
