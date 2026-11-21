@@ -1,0 +1,74 @@
+<?php
+
+namespace App\Actions\Valoraciones;
+
+use App\Models\Receta;
+use App\Models\User;
+use App\Models\Valoracion;
+use App\Rules\IdentificadorEntero;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
+
+class EliminarValoracion
+{
+    /**
+     * Elimina de forma idempotente la valoración del usuario sobre una receta publicada y vigente.
+     *
+     * @return array{puntuacion: null, valoracion_promedio: float|null, cantidad_valoraciones: int}
+     *
+     * @throws ValidationException
+     */
+    public function ejecutar(User $usuario, mixed $recetaId): array
+    {
+        if (! $usuario->estaActivo()) {
+            throw ValidationException::withMessages([
+                'usuario' => 'La cuenta no se encuentra activa.',
+            ]);
+        }
+
+        if (! IdentificadorEntero::esValido($recetaId)) {
+            abort(404, 'Receta no encontrada.');
+        }
+
+        $id = (int) $recetaId;
+
+        return DB::transaction(function () use ($usuario, $id) {
+            // Orden canónico de bloqueos: usuario, luego receta, luego valoracion
+            $userActual = User::whereKey($usuario->id)->lockForUpdate()->firstOrFail();
+            if (! $userActual->estaActivo()) {
+                throw ValidationException::withMessages(['usuario' => 'La cuenta no se encuentra activa.']);
+            }
+
+            $receta = Receta::withTrashed()->whereKey($id)->lockForUpdate()->first();
+
+            if (! $receta || $receta->publicada_en === null) {
+                abort(404, 'Receta no encontrada o no disponible para valorar.');
+            }
+
+            if ($receta->trashed()) {
+                throw ValidationException::withMessages([
+                    'receta' => 'No es posible valorar una receta que ha sido eliminada.',
+                ]);
+            }
+
+            $valoracion = Valoracion::where('usuario_id', $userActual->id)
+                ->where('receta_id', $receta->id)
+                ->lockForUpdate()
+                ->first();
+
+            if ($valoracion) {
+                $valoracion->delete();
+            }
+
+            // Recalcular agregados vigentes
+            $promedio = $receta->valoraciones()->avg('puntuacion');
+            $cantidad = (int) $receta->valoraciones()->count();
+
+            return [
+                'puntuacion' => null,
+                'valoracion_promedio' => $promedio !== null ? round((float) $promedio, 2) : null,
+                'cantidad_valoraciones' => $cantidad,
+            ];
+        }, attempts: 3);
+    }
+}

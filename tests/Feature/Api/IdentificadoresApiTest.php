@@ -24,6 +24,7 @@ test('identificadores de recetas no aceptan representaciones numericas impropias
     $this->deleteJson("/api/v1/favoritos/{$id}")->assertNotFound();
     $this->getJson("/api/v1/recetas/{$id}/valoracion")->assertNotFound();
     $this->putJson("/api/v1/recetas/{$id}/valoracion", ['puntuacion' => 5])->assertNotFound();
+    $this->deleteJson("/api/v1/recetas/{$id}/valoracion")->assertNotFound();
     $this->assertDatabaseHas('favoritos', ['usuario_id' => $usuario->id, 'receta_id' => 1]);
     $this->assertDatabaseCount('valoraciones', 0);
 })->with(['1.9', '1.0', '1e0', '+1', ' 1 ', '01', '0', '-1', '9223372036854775808']);

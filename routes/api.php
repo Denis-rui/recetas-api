@@ -95,6 +95,7 @@ Route::prefix('v1')->name('api.v1.')->group(function () {
         Route::prefix('recetas/{receta}/valoracion')->name('recetas.valoracion.')->group(function () {
             Route::get('/', [ValoracionController::class, 'show'])->name('show');
             Route::match(['put', 'post'], '/', [ValoracionController::class, 'store'])->name('store');
+            Route::delete('/', [ValoracionController::class, 'destroy'])->name('destroy');
         });
     });
 });

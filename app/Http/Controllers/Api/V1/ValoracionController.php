@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Actions\Valoraciones\EliminarValoracion;
 use App\Actions\Valoraciones\RegistrarValoracion;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\Valoraciones\GuardarValoracionRequest;
@@ -61,6 +62,22 @@ class ValoracionController extends Controller
 
         return response()->json([
             'mensaje' => 'Valoración registrada exitosamente.',
+            'data' => new MiValoracionResource([
+                'receta_id' => (int) $receta,
+                ...$resultado,
+            ]),
+        ], Response::HTTP_OK);
+    }
+
+    /**
+     * Elimina de forma idempotente la puntuación asignada por el usuario a la receta.
+     */
+    public function destroy(Request $request, mixed $receta, EliminarValoracion $accion): JsonResponse
+    {
+        $resultado = $accion->ejecutar($request->user(), $receta);
+
+        return response()->json([
+            'mensaje' => 'Valoración eliminada exitosamente.',
             'data' => new MiValoracionResource([
                 'receta_id' => (int) $receta,
                 ...$resultado,

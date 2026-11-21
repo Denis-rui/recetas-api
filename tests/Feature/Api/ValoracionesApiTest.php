@@ -63,6 +63,7 @@ test('requiere autenticacion y cuenta activa para consultar y registrar valoraci
 
     $this->getJson("/api/v1/recetas/{$receta->id}/valoracion")->assertUnauthorized();
     $this->postJson("/api/v1/recetas/{$receta->id}/valoracion", ['puntuacion' => 5])->assertUnauthorized();
+    $this->deleteJson("/api/v1/recetas/{$receta->id}/valoracion")->assertUnauthorized();
 
     $this->usuario->update(['activo' => false]);
 
@@ -72,6 +73,10 @@ test('requiere autenticacion y cuenta activa para consultar y registrar valoraci
 
     $this->withHeader('Authorization', 'Bearer '.$this->token)
         ->postJson("/api/v1/recetas/{$receta->id}/valoracion", ['puntuacion' => 5])
+        ->assertForbidden();
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/v1/recetas/{$receta->id}/valoracion")
         ->assertForbidden();
 });
 
@@ -289,4 +294,72 @@ test('aprobacion de correccion en revision web conserva las valoraciones intacta
     expect($catalogo->json('data.nombre'))->toBe('Ají de Gallina Mejorado y Más Cremoso');
     expect((float) $catalogo->json('data.valoracion_promedio'))->toEqual(5.0);
     expect($catalogo->json('data.cantidad_valoraciones'))->toBe(1);
+});
+
+test('elimina valoracion propia de forma idempotente y recalcula promedio y cantidad', function () {
+    $receta = crearRecetaPublicaValoraciones($this->usuario);
+
+    // Usuario 1 vota con 5
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->postJson("/api/v1/recetas/{$receta->id}/valoracion", ['puntuacion' => 5])
+        ->assertOk();
+
+    // Usuario 2 vota con 3
+    $otroUsuario = User::factory()->create(['activo' => true]);
+    $tokenOtro = $otroUsuario->createToken('Movil2')->plainTextToken;
+
+    app('auth')->forgetGuards();
+    $this->withHeader('Authorization', 'Bearer '.$tokenOtro)
+        ->postJson("/api/v1/recetas/{$receta->id}/valoracion", ['puntuacion' => 3])
+        ->assertOk();
+
+    // Usuario 1 elimina su valoración -> queda solo el voto de 3 del Usuario 2
+    app('auth')->forgetGuards();
+    $resDelete1 = $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/v1/recetas/{$receta->id}/valoracion");
+
+    $resDelete1->assertOk()
+        ->assertJsonPath('mensaje', 'Valoración eliminada exitosamente.')
+        ->assertJsonPath('data.receta_id', $receta->id)
+        ->assertJsonPath('data.puntuacion', null)
+        ->assertJsonPath('data.valoracion_promedio', 3)
+        ->assertJsonPath('data.cantidad_valoraciones', 1);
+
+    // Repetir DELETE para el Usuario 1 es idempotente y no altera el voto del Usuario 2
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/v1/recetas/{$receta->id}/valoracion")
+        ->assertOk()
+        ->assertJsonPath('data.puntuacion', null)
+        ->assertJsonPath('data.valoracion_promedio', 3)
+        ->assertJsonPath('data.cantidad_valoraciones', 1);
+
+    // Usuario 2 elimina su valoración -> la receta queda sin valoraciones (promedio null, cantidad 0)
+    app('auth')->forgetGuards();
+    $this->withHeader('Authorization', 'Bearer '.$tokenOtro)
+        ->deleteJson("/api/v1/recetas/{$receta->id}/valoracion")
+        ->assertOk()
+        ->assertJsonPath('data.puntuacion', null)
+        ->assertJsonPath('data.valoracion_promedio', null)
+        ->assertJsonPath('data.cantidad_valoraciones', 0);
+
+    expect(Valoracion::where('receta_id', $receta->id)->count())->toBe(0);
+});
+
+test('no permite eliminar valoracion en recetas privadas ni eliminadas ni inexistentes', function () {
+    $recetaPrivada = Receta::factory()->create(['publicada_en' => null]);
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/v1/recetas/{$recetaPrivada->id}/valoracion")
+        ->assertNotFound();
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson('/api/v1/recetas/999999/valoracion')
+        ->assertNotFound();
+
+    $recetaEliminada = crearRecetaPublicaValoraciones($this->usuario);
+    $recetaEliminada->delete();
+
+    $this->withHeader('Authorization', 'Bearer '.$this->token)
+        ->deleteJson("/api/v1/recetas/{$recetaEliminada->id}/valoracion")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('receta');
 });
