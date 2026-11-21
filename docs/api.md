@@ -310,7 +310,7 @@ La retirada administrativa y sus efectos todavía requieren completar el flujo f
 
 `GET /recetas/{receta}/valoracion`, autenticado, devuelve en `data`: `receta_id`, `puntuacion` propia nullable, `valoracion_promedio` nullable y `cantidad_valoraciones`.
 
-`PUT` o `POST /recetas/{receta}/valoracion` recibe `{"puntuacion": 5}` y devuelve 200 con `mensaje` y el mismo recurso en `data`. Se admite un entero de 1 a 5. Cada cuenta tiene una valoración modificable por receta. Se permite autovalorar y valorar como administrador. Solo se consultan/valoran recetas publicadas y vigentes. Las correcciones aprobadas mantienen las valoraciones de la receta original; una receta nueva no las hereda.
+`PUT` o `POST /recetas/{receta}/valoracion` recibe `{"puntuacion": 5}` y devuelve 200 con `mensaje` y el mismo recurso en `data`. Se admite un entero de 1 a 5. Cada cuenta tiene una valoración modificable por receta. `DELETE /recetas/{receta}/valoracion` retira de forma idempotente la valoración propia del usuario autenticado y devuelve 200 con `mensaje` y el mismo recurso en `data` (`puntuacion: null`, `valoracion_promedio` y `cantidad_valoraciones` recalculados). Se permite autovalorar y valorar como administrador. Solo se consultan/valoran recetas publicadas y vigentes. Las correcciones aprobadas mantienen las valoraciones de la receta original; una receta nueva no las hereda.
 
 ## 10. Límites de solicitudes
 
